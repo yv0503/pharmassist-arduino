@@ -10,6 +10,7 @@
 #include "setup/wifi_credentials.h"
 #include "setup/bluetooth.h"
 #include "setup/wifi_connection.h"
+#include "networking/web_server.h"
 
 // Arduino UNO R4 WiFi
 
@@ -72,11 +73,26 @@ void setup() {
   loadWiFiCredentials(ssid, password);
   wifiStatus = connectToWiFi(ssid, password, matrix);
 
+  // Initialize web server after WiFi connection is established
+  if (wifiStatus == WL_CONNECTED) {
+    setupWebServer();
+    Serial.print("Web server available at http://");
+    Serial.println(WiFi.localIP());
+  }
+
   delay(3000);
   matrix.clear();
   digitalWrite(LED_BUILTIN, HIGH);
 }
 
 void loop() {
-  // Main program logic here
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi connection lost. Attempting to reconnect...");
+    wifiStatus = connectToWiFi(ssid, password, matrix);
+  }
+
+  if (wifiStatus == WL_CONNECTED) {
+    handleWebServerClients();
+  }
 }
+
