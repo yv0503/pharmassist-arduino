@@ -2,11 +2,8 @@
 #include <Arduino_LED_Matrix.h>
 #include <EEPROM.h>
 #include <WiFiS3.h>
-#include <local/BLELocalDevice.h>
 
 #include "constants.h"
-#include "led_matrix/bluetooth_matrix.h"
-#include "led_matrix/wifi_matrix.h"
 #include "setup/wifi_credentials.h"
 #include "setup/bluetooth.h"
 #include "setup/wifi_connection.h"
@@ -28,6 +25,7 @@ bool wasConnected = false;
 
 const String testServer = "www.google.com";
 int wifiStatus = WL_IDLE_STATUS;
+int failedAttempts = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -36,44 +34,37 @@ void setup() {
   Serial.println("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n");
   EEPROM.begin();
   matrix.begin();
+  delay(1000);
   isInitialized = EEPROM.read(isInitializedAddress);
 
   if (isInitialized != 1) {
-    Serial.println("Device not initialized. Starting Bluetooth setup...");
-    setupBluetooth(ssid, password);
-    matrix.loadFrame(bluetooth_matrix[0]);
-
-    while (isInitialized != 1) {
-      bluetoothLoop();
-
-      const bool isConnected = isBleConnected();
-
-      if (const unsigned long currentMillis = millis(); currentMillis - previousMillis >= interval) {
-        previousMillis = currentMillis;
-        
-        if (!isConnected) {
-          currentFrame = 1 - currentFrame;
-          matrix.loadFrame(bluetooth_matrix[currentFrame]);
-        } else if (!wasConnected) {
-          matrix.loadFrame(bluetooth_matrix[1]);
-          wasConnected = true;
-        }
-      }
-
-      if (!isConnected) wasConnected = false;
-
-      isInitialized = EEPROM.read(isInitializedAddress);
-    }
-
-    BLE.end();
-    Serial.println("Bluetooth setup complete");
-    matrix.clear();
+    runBluetoothSetup(ssid, password, matrix);
   }
 
   loadWiFiCredentials(ssid, password);
   wifiStatus = connectToWiFi(ssid, password, matrix);
 
-  // Initialize web server after WiFi connection is established
+  int retryCount = 0;
+  while (wifiStatus != WL_CONNECTED && retryCount < 2) {
+    Serial.print("WiFi connection failed. Retry attempt ");
+    Serial.print(retryCount + 1);
+    Serial.println("/3...");
+    retryCount++;
+    wifiStatus = connectToWiFi(ssid, password, matrix);
+  }
+
+  // If still failed after 3 attempts, restart Bluetooth setup
+  if (wifiStatus != WL_CONNECTED) {
+    Serial.println("WiFi connection failed after 3 attempts. Restarting Bluetooth setup...");
+
+    EEPROM.write(isInitializedAddress, 0);
+
+    runBluetoothSetup(ssid, password, matrix);
+
+    loadWiFiCredentials(ssid, password);
+    wifiStatus = connectToWiFi(ssid, password, matrix);
+  }
+
   if (wifiStatus == WL_CONNECTED) {
     setupWebServer();
     Serial.print("Web server available at http://");
@@ -95,4 +86,3 @@ void loop() {
     handleWebServerClients();
   }
 }
-

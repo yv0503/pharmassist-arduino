@@ -7,21 +7,28 @@ int connectToWiFi(const String& ssid, const String& password, ArduinoLEDMatrix& 
   
   WiFi.begin(ssid.c_str(), password.c_str());
   unsigned long previousMillis = 0;
+  unsigned long connectionStartTime = millis();
   byte currentFrame = 0;
   int wifiStatus = WL_IDLE_STATUS;
+  constexpr unsigned long CONNECTION_TIMEOUT = 5000;
 
   while (wifiStatus != WL_CONNECTED) {
     wifiStatus = WiFi.status();
 
     if (const unsigned long currentMillis = millis(); currentMillis - previousMillis >= 500) {
       previousMillis = currentMillis;
-      
       matrix.loadFrame(wifi_matrix[currentFrame]);
       currentFrame = (currentFrame + 1) % 4;
     }
 
     if (wifiStatus == WL_CONNECT_FAILED) {
-      Serial.println("WiFi connection failed");
+      Serial.println("WiFi connection failed - invalid credentials or network issues");
+      break;
+    }
+    
+    if (millis() - connectionStartTime > CONNECTION_TIMEOUT) {
+      Serial.println("WiFi connection timeout");
+      wifiStatus = WL_CONNECTION_LOST;
       break;
     }
   }
@@ -31,6 +38,9 @@ int connectToWiFi(const String& ssid, const String& password, ArduinoLEDMatrix& 
     Serial.println("Connected to WiFi");
     Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
+    Serial.print("Signal strength (RSSI): ");
+    Serial.print(WiFi.RSSI());
+    Serial.println(" dBm");
 
     Serial.print("Testing internet connection... ");
     const String testServer = "www.google.com";
@@ -43,7 +53,8 @@ int connectToWiFi(const String& ssid, const String& password, ArduinoLEDMatrix& 
       matrix.loadFrame(wifi_matrix[1]);
     }
   } else {
-    Serial.println("Failed to connect to WiFi");
+    Serial.print("Failed to connect to WiFi. Status code: ");
+    Serial.println(wifiStatus);
     matrix.loadFrame(wifi_matrix[0]);
   }
 

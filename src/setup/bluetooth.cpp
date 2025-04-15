@@ -3,9 +3,11 @@
 #include <ArduinoBLE.h>
 #include <BLECharacteristic.h>
 #include <ArduinoJson.h>
+#include <Arduino_LED_Matrix.h>
 
-#include "bluetooth.h"
 #include "../constants.h"
+#include "../led_matrix/bluetooth_matrix.h"
+#include "bluetooth.h"
 #include "wifi_credentials.h"
 
 BLEService bluetoothService(WIFI_SERVICE_UUID.c_str());
@@ -79,7 +81,6 @@ void onBLEDisconnected(BLEDevice central) { // NOLINT(*-unnecessary-value-param)
 }
 
 void setupBluetooth(String& ssid, String& password) {
-  // Store references to the external variables
   ssidPtr = &ssid;
   passwordPtr = &password;
   setupComplete = false;
@@ -112,9 +113,8 @@ void setupBluetooth(String& ssid, String& password) {
 void bluetoothLoop() {
   BLE.poll();
 
-  // Check if setup is complete to allow main loop to detect completion
   if (setupComplete) {
-    delay(1000); // Give time for confirmation to be sent
+    delay(1000);
     BLE.stopAdvertise();
   }
 }
@@ -122,3 +122,41 @@ void bluetoothLoop() {
 bool isBleConnected() {
   return BLE.connected();
 }
+
+void runBluetoothSetup(String& ssid, String& password, ArduinoLEDMatrix& matrix) {
+  Serial.println("Starting Bluetooth setup...");
+  setupBluetooth(ssid, password);
+  matrix.begin();
+  matrix.loadFrame(bluetooth_matrix[0]);
+  
+  bool wasConnected = false;
+  
+  unsigned long previousMillis = 0;
+  byte currentFrame = 0;
+
+  while (EEPROM.read(isInitializedAddress) != 1) {
+    constexpr long interval = 1000;
+    bluetoothLoop();
+
+    const bool isConnected = isBleConnected();
+
+    if (const unsigned long currentMillis = millis(); currentMillis - previousMillis >= interval) {
+      previousMillis = currentMillis;
+      
+      if (!isConnected) {
+        currentFrame = 1 - currentFrame;
+        matrix.loadFrame(bluetooth_matrix[currentFrame]);
+      } else if (!wasConnected) {
+        matrix.loadFrame(bluetooth_matrix[1]);
+        wasConnected = true;
+      }
+    }
+
+    if (!isConnected) wasConnected = false;
+  }
+
+  BLE.end();
+  Serial.println("Bluetooth setup complete");
+  matrix.clear();
+}
+
