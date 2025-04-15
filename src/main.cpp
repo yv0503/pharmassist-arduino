@@ -1,12 +1,15 @@
 #include <Arduino.h>
 #include <Arduino_LED_Matrix.h>
 #include <EEPROM.h>
+#include <WiFiS3.h>
 #include <local/BLELocalDevice.h>
 
 #include "constants.h"
 #include "led_matrix/bluetooth_matrix.h"
+#include "led_matrix/wifi_matrix.h"
 #include "setup/wifi_credentials.h"
 #include "setup/bluetooth.h"
+#include "setup/wifi_connection.h"
 
 // Arduino UNO R4 WiFi
 
@@ -21,6 +24,9 @@ unsigned long previousMillis = 0;
 constexpr long interval = 1000;
 byte currentFrame = 0;
 bool wasConnected = false;
+
+const String testServer = "www.google.com";
+int wifiStatus = WL_IDLE_STATUS;
 
 void setup() {
   Serial.begin(9600);
@@ -60,9 +66,15 @@ void setup() {
 
     BLE.end();
     Serial.println("Bluetooth setup complete");
+    matrix.clear();
   }
 
   loadWiFiCredentials(ssid, password);
+  wifiStatus = connectToWiFi(ssid, password, matrix);
+
+  delay(3000);
+  matrix.clear();
+  digitalWrite(LED_BUILTIN, HIGH);
 }
 
 void loop() {
