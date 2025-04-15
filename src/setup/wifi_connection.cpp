@@ -1,16 +1,15 @@
 #include "wifi_connection.h"
 
-int connectToWiFi(const String& ssid, const String& password, ArduinoLEDMatrix& matrix) {
+int connectToWiFi(const String &ssid, const String &password, ArduinoLEDMatrix &matrix) {
   Serial.print("Connecting to WiFi network: ");
   Serial.println(ssid);
   Serial.println();
-  
+
   WiFi.begin(ssid.c_str(), password.c_str());
   unsigned long previousMillis = 0;
-  unsigned long connectionStartTime = millis();
+  const unsigned long connectionStartTime = millis();
   byte currentFrame = 0;
   int wifiStatus = WL_IDLE_STATUS;
-  constexpr unsigned long CONNECTION_TIMEOUT = 5000;
 
   while (wifiStatus != WL_CONNECTED) {
     wifiStatus = WiFi.status();
@@ -25,14 +24,14 @@ int connectToWiFi(const String& ssid, const String& password, ArduinoLEDMatrix& 
       Serial.println("WiFi connection failed - invalid credentials or network issues");
       break;
     }
-    
-    if (millis() - connectionStartTime > CONNECTION_TIMEOUT) {
+
+    if (constexpr unsigned long CONNECTION_TIMEOUT = 5000; millis() - connectionStartTime > CONNECTION_TIMEOUT) {
       Serial.println("WiFi connection timeout");
       wifiStatus = WL_CONNECTION_LOST;
       break;
     }
   }
-  
+
   if (wifiStatus == WL_CONNECTED) {
     delay(1000L);
     Serial.println("Connected to WiFi");

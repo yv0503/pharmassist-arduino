@@ -1,10 +1,9 @@
 #include <EEPROM.h>
 
+#include <constants.h>
 #include "wifi_credentials.h"
 
-#include "../constants.h"
-
-void saveWiFiCredentials(const String& ssid, const String& password) {
+void saveWiFiCredentials(const String &ssid, const String &password) {
     EEPROM.write(isInitializedAddress, 1);
 
     for (int i = 0; i < ssid.length(); i++) {
@@ -20,7 +19,7 @@ void saveWiFiCredentials(const String& ssid, const String& password) {
     Serial.println("WiFi credentials saved to EEPROM");
 }
 
-void loadWiFiCredentials(String& ssid, String& password) {
+void loadWiFiCredentials(String &ssid, String &password) {
     ssid = "";
     for (int i = 0; i < maxStrLength; i++) {
         const char c = EEPROM.read(ssidStartAddress + i);

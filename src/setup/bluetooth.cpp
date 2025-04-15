@@ -5,34 +5,36 @@
 #include <ArduinoJson.h>
 #include <Arduino_LED_Matrix.h>
 
-#include "../constants.h"
+#include <constants.h>
 #include "../led_matrix/bluetooth_matrix.h"
 #include "bluetooth.h"
 #include "wifi_credentials.h"
 
 BLEService bluetoothService(WIFI_SERVICE_UUID.c_str());
-BLEStringCharacteristic wifiJsonCharacteristic(WIFI_JSON_CHARACTERISTIC_UUID.c_str(), BLEWrite | BLERead, JSON_BUFFER_SIZE);
+BLEStringCharacteristic wifiJsonCharacteristic(WIFI_JSON_CHARACTERISTIC_UUID.c_str(), BLEWrite | BLERead,
+                                               JSON_BUFFER_SIZE);
 
 // References to external variables
-String* ssidPtr = nullptr;
-String* passwordPtr = nullptr;
+String *ssidPtr = nullptr;
+String *passwordPtr = nullptr;
 bool setupComplete = false;
 
 // ReSharper disable CppParameterNeverUsed
-void onJsonReceived(BLEDevice central, BLECharacteristic characteristic) { // NOLINT(*-unnecessary-value-param)
+void onJsonReceived(BLEDevice central, BLECharacteristic characteristic) {
+  // NOLINT(*-unnecessary-value-param)
   String jsonStr = wifiJsonCharacteristic.value();
   Serial.print("Received JSON: ");
   Serial.println(jsonStr);
-  
+
   JsonDocument doc;
   const DeserializationError error = deserializeJson(doc, jsonStr);
-  
+
   if (error) {
     Serial.print("JSON parsing failed: ");
     Serial.println(error.c_str());
     return;
   }
-  
+
   if (!doc["ssid"].isNull() && !doc["password"].isNull()) {
     *ssidPtr = doc["ssid"].as<String>();
     *passwordPtr = doc["password"].as<String>();
@@ -64,13 +66,15 @@ void onJsonReceived(BLEDevice central, BLECharacteristic characteristic) { // NO
 }
 
 // ReSharper disable once CppPassValueParameterByConstReference
-void onBLEConnected(BLEDevice central) { // NOLINT(*-unnecessary-value-param)
+void onBLEConnected(BLEDevice central) {
+  // NOLINT(*-unnecessary-value-param)
   Serial.print("Connected to central: ");
   Serial.println(central.address());
 }
 
 // ReSharper disable once CppPassValueParameterByConstReference
-void onBLEDisconnected(BLEDevice central) { // NOLINT(*-unnecessary-value-param)
+void onBLEDisconnected(BLEDevice central) {
+  // NOLINT(*-unnecessary-value-param)
   Serial.print("Disconnected from central: ");
   Serial.println(central.address());
 
@@ -80,7 +84,7 @@ void onBLEDisconnected(BLEDevice central) { // NOLINT(*-unnecessary-value-param)
   }
 }
 
-void setupBluetooth(String& ssid, String& password) {
+void setupBluetooth(String &ssid, String &password) {
   ssidPtr = &ssid;
   passwordPtr = &password;
   setupComplete = false;
@@ -123,14 +127,14 @@ bool isBleConnected() {
   return BLE.connected();
 }
 
-void runBluetoothSetup(String& ssid, String& password, ArduinoLEDMatrix& matrix) {
+void runBluetoothSetup(String &ssid, String &password, ArduinoLEDMatrix &matrix) {
   Serial.println("Starting Bluetooth setup...");
   setupBluetooth(ssid, password);
   matrix.begin();
   matrix.loadFrame(bluetooth_matrix[0]);
-  
+
   bool wasConnected = false;
-  
+
   unsigned long previousMillis = 0;
   byte currentFrame = 0;
 
@@ -142,7 +146,7 @@ void runBluetoothSetup(String& ssid, String& password, ArduinoLEDMatrix& matrix)
 
     if (const unsigned long currentMillis = millis(); currentMillis - previousMillis >= interval) {
       previousMillis = currentMillis;
-      
+
       if (!isConnected) {
         currentFrame = 1 - currentFrame;
         matrix.loadFrame(bluetooth_matrix[currentFrame]);

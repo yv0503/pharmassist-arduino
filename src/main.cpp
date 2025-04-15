@@ -3,7 +3,7 @@
 #include <EEPROM.h>
 #include <WiFiS3.h>
 
-#include "constants.h"
+#include <constants.h>
 #include "setup/wifi_credentials.h"
 #include "setup/bluetooth.h"
 #include "setup/wifi_connection.h"

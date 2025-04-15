@@ -1,8 +1,9 @@
-#include "web_server.h"
-#include "html_content.h"
-#include "../constants.h"
 #include <Arduino.h>
 #include <EEPROM.h>
+
+#include <constants.h>
+#include "web_server.h"
+#include "html_content.h"
 
 WiFiServer server(80);
 
@@ -12,26 +13,22 @@ void setupWebServer() {
 }
 
 void handleWebServerClients() {
-  WiFiClient client = server.available();
-  
-  if (client) {
+  if (WiFiClient client = server.available()) {
     Serial.print("New client connected: ");
     Serial.println(client.remoteIP());
     String currentLine = "";
     bool isResetRequested = false;
-    
+
     while (client.connected()) {
       if (client.available()) {
-        char c = client.read();
-        
-        if (c == '\n') {
+        if (const char c = client.read(); c == '\n') {
           if (currentLine.length() == 0) {
             // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
             // and a content-type so the client knows what's coming, then a blank line:
             client.println("HTTP/1.1 200 OK");
             client.println("Content-type:text/html");
             client.println();
-            
+
             if (isResetRequested) {
               EEPROM.write(isInitializedAddress, 0);
               digitalWrite(LED_BUILTIN, LOW);

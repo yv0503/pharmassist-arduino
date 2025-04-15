@@ -1,7 +1,7 @@
 #ifndef HTML_CONTENT_H
 #define HTML_CONTENT_H
 
-const char* HTML_MAIN_CONTENT = R"(
+inline auto HTML_MAIN_CONTENT = R"(
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -59,7 +59,7 @@ window.onclick=function(e){if(e.target===m)m.style.display='none'};
 </html>
 )";
 
-const char* HTML_RESET_CONTENT = R"(
+inline auto HTML_RESET_CONTENT = R"(
 
 <!DOCTYPE html>
 <html lang="en">
