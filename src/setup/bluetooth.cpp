@@ -127,11 +127,22 @@ bool isBleConnected() {
   return BLE.connected();
 }
 
-void runBluetoothSetup(String &ssid, String &password, ArduinoLEDMatrix &matrix) {
+void runBluetoothSetup(String &ssid, String &password, ArduinoLEDMatrix &matrix, LiquidCrystal_I2C &lcd) {
   Serial.println("Starting Bluetooth setup...");
   setupBluetooth(ssid, password);
+
   matrix.begin();
   matrix.loadFrame(bluetooth_matrix[0]);
+  
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("WiFi Setup Mode");
+  lcd.setCursor(0, 1);
+  lcd.print("Connect to device:");
+  lcd.setCursor(0, 2);
+  lcd.print(DEVICE_NAME);
+  lcd.setCursor(0, 3);
+  lcd.print("via Bluetooth");
 
   bool wasConnected = false;
 
@@ -150,14 +161,42 @@ void runBluetoothSetup(String &ssid, String &password, ArduinoLEDMatrix &matrix)
       if (!isConnected) {
         currentFrame = 1 - currentFrame;
         matrix.loadFrame(bluetooth_matrix[currentFrame]);
+        
+        if (currentFrame == 0) {
+          lcd.setCursor(0, 3);
+          lcd.print("Waiting...        ");
+        } else {
+          lcd.setCursor(0, 3);
+          lcd.print("via Bluetooth     ");
+        }
       } else if (!wasConnected) {
         matrix.loadFrame(bluetooth_matrix[1]);
+        lcd.setCursor(0, 2);
+        lcd.print("Device connected  ");
+        lcd.setCursor(0, 3);
+        lcd.print("Waiting for config");
         wasConnected = true;
       }
     }
 
-    if (!isConnected) wasConnected = false;
+    if (!isConnected && wasConnected) {
+      wasConnected = false;
+      lcd.setCursor(0, 2);
+      lcd.print(DEVICE_NAME);
+      lcd.setCursor(0, 3);
+      lcd.print("Disconnected      ");
+      delay(1000);
+      lcd.setCursor(0, 3);
+      lcd.print("via Bluetooth     ");
+    }
   }
+
+  // Setup complete
+  lcd.clear();
+  lcd.setCursor(0, 1);
+  lcd.print("WiFi Setup Complete");
+  lcd.setCursor(0, 2);
+  lcd.print("Connecting to WiFi...");
 
   BLE.end();
   Serial.println("Bluetooth setup complete");

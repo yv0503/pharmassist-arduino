@@ -1,9 +1,15 @@
 #include "wifi_connection.h"
 
-int connectToWiFi(const String &ssid, const String &password, ArduinoLEDMatrix &matrix) {
+int connectToWiFi(const String &ssid, const String &password, ArduinoLEDMatrix &matrix, LiquidCrystal_I2C &lcd) {
   Serial.print("Connecting to WiFi network: ");
   Serial.println(ssid);
   Serial.println();
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Connecting to WiFi");
+  lcd.setCursor(0, 1);
+  lcd.print(ssid);
 
   WiFi.begin(ssid.c_str(), password.c_str());
   unsigned long previousMillis = 0;
@@ -18,6 +24,13 @@ int connectToWiFi(const String &ssid, const String &password, ArduinoLEDMatrix &
       previousMillis = currentMillis;
       matrix.loadFrame(wifi_matrix[currentFrame]);
       currentFrame = (currentFrame + 1) % 4;
+
+      lcd.setCursor(0, 2);
+      lcd.print("Connecting");
+      for (int i = 0; i < currentFrame + 1; i++) {
+        lcd.print(".");
+      }
+      lcd.print("   ");
     }
 
     if (wifiStatus == WL_CONNECT_FAILED) {
@@ -41,20 +54,44 @@ int connectToWiFi(const String &ssid, const String &password, ArduinoLEDMatrix &
     Serial.print(WiFi.RSSI());
     Serial.println(" dBm");
 
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("WiFi Connected!");
+    lcd.setCursor(0, 1);
+    lcd.print("IP: ");
+    lcd.print(WiFi.localIP());
+    lcd.setCursor(0, 2);
+    lcd.print("RSSI: ");
+    lcd.print(WiFi.RSSI());
+    lcd.print(" dBm");
+
     Serial.print("Testing internet connection... ");
     const String testServer = "www.google.com";
     if (WiFiClient client; client.connect(testServer.c_str(), 80)) {
       Serial.println("Success!");
       matrix.loadFrame(wifi_matrix[3]);
+      lcd.setCursor(0, 3);
+      lcd.print("Internet: Connected");
       client.stop();
     } else {
       Serial.println("Failed to connect to test server");
       matrix.loadFrame(wifi_matrix[1]);
+      lcd.setCursor(0, 3);
+      lcd.print("Internet: Failed");
     }
   } else {
     Serial.print("Failed to connect to WiFi. Status code: ");
     Serial.println(wifiStatus);
     matrix.loadFrame(wifi_matrix[0]);
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("WiFi Connection");
+    lcd.setCursor(0, 1);
+    lcd.print("Failed!");
+    lcd.setCursor(0, 2);
+    lcd.print("Status code: ");
+    lcd.print(wifiStatus);
   }
 
   return wifiStatus;

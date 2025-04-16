@@ -2,6 +2,7 @@
 #include <Arduino_LED_Matrix.h>
 #include <EEPROM.h>
 #include <WiFiS3.h>
+#include <LiquidCrystal_I2C.h>
 
 #include <constants.h>
 #include "setup/wifi_credentials.h"
@@ -13,6 +14,7 @@
 
 #define resetPin 12
 
+LiquidCrystal_I2C lcd(0x27, 20, 4);
 ArduinoLEDMatrix matrix;
 byte isInitialized = 0;
 
@@ -34,15 +36,20 @@ void setup() {
   Serial.println("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n");
   EEPROM.begin();
   matrix.begin();
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(4, 1);
+  lcd.print("PharmAssist");
+
   delay(1000);
   isInitialized = EEPROM.read(isInitializedAddress);
 
   if (isInitialized != 1) {
-    runBluetoothSetup(ssid, password, matrix);
+    runBluetoothSetup(ssid, password, matrix, lcd);
   }
 
   loadWiFiCredentials(ssid, password);
-  wifiStatus = connectToWiFi(ssid, password, matrix);
+  wifiStatus = connectToWiFi(ssid, password, matrix, lcd);
 
   int retryCount = 0;
   while (wifiStatus != WL_CONNECTED && retryCount < 2) {
@@ -50,7 +57,7 @@ void setup() {
     Serial.print(retryCount + 1);
     Serial.println("/3...");
     retryCount++;
-    wifiStatus = connectToWiFi(ssid, password, matrix);
+    wifiStatus = connectToWiFi(ssid, password, matrix, lcd);
   }
 
   // If still failed after 3 attempts, restart Bluetooth setup
@@ -59,10 +66,10 @@ void setup() {
 
     EEPROM.write(isInitializedAddress, 0);
 
-    runBluetoothSetup(ssid, password, matrix);
+    runBluetoothSetup(ssid, password, matrix, lcd);
 
     loadWiFiCredentials(ssid, password);
-    wifiStatus = connectToWiFi(ssid, password, matrix);
+    wifiStatus = connectToWiFi(ssid, password, matrix, lcd);
   }
 
   if (wifiStatus == WL_CONNECTED) {
@@ -79,10 +86,11 @@ void setup() {
 void loop() {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi connection lost. Attempting to reconnect...");
-    wifiStatus = connectToWiFi(ssid, password, matrix);
+    wifiStatus = connectToWiFi(ssid, password, matrix, lcd);
   }
 
   if (wifiStatus == WL_CONNECTED) {
     handleWebServerClients();
   }
 }
+
