@@ -1,9 +1,8 @@
 #include <Arduino.h>
-#include <EEPROM.h>
 
-#include <constants.h>
 #include "web_server.h"
 #include "html_content.h"
+#include "api_handler.h"
 
 WiFiServer server(80);
 
@@ -16,40 +15,50 @@ void handleWebServerClients(LiquidCrystal_I2C &lcd) {
   if (WiFiClient client = server.available()) {
     Serial.print("New client connected: ");
     Serial.println(client.remoteIP());
+    
     String currentLine = "";
-    bool isResetRequested = false;
+    String method = "";
+    String endpoint = "";
 
-    while (client.connected()) {
+    unsigned long timeout = millis();
+    while (client.connected() && millis() - timeout < 2000) {
       if (client.available()) {
+        timeout = millis();
+
         if (const char c = client.read(); c == '\n') {
           if (currentLine.length() == 0) {
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println();
 
-            if (isResetRequested) {
-              EEPROM.update(isInitializedAddress, 0);
-              digitalWrite(LED_BUILTIN, LOW);
-              Serial.println("Factory reset performed");
-              lcd.clear();
-              lcd.setCursor(0, 1);
-              lcd.print(" Factory reset done");
-              lcd.setCursor(0, 2);
-              lcd.print("  Restart Required");
+            if (endpoint.startsWith("/api/")) {
+              auto [statusCode, contentType, body] = ApiHandler::processRequest(endpoint, method, lcd);
 
-              client.println(HTML_RESET_CONTENT);
-
-              delay(2000);
+              client.print("HTTP/1.1 ");
+              client.print(statusCode);
+              client.println(" OK");
+              client.print("Content-Type: ");
+              client.println(contentType);
+              client.println("Connection: close");
+              client.println();
+              client.println(body);
             } else {
+              client.println("HTTP/1.1 200 OK");
+              client.println("Content-type:text/html");
+              client.println("Connection: close");
+              client.println();
               client.print(HTML_MAIN_CONTENT);
             }
-
-            client.println();
             break;
           }
 
-          if (currentLine.startsWith("GET /reset")) {
-            isResetRequested = true;
+          if (currentLine.startsWith("GET ") || currentLine.startsWith("POST ")) {
+            const int firstSpace = currentLine.indexOf(' ');
+            const int secondSpace = currentLine.indexOf(' ', firstSpace + 1);
+              
+            method = currentLine.substring(0, firstSpace);
+            endpoint = currentLine.substring(firstSpace + 1, secondSpace);
+
+            if (const int queryStart = endpoint.indexOf('?'); queryStart != -1) {
+              endpoint = endpoint.substring(0, queryStart);
+            }
           }
           currentLine = "";
         } else if (c != '\r') {
@@ -57,8 +66,8 @@ void handleWebServerClients(LiquidCrystal_I2C &lcd) {
         }
       }
     }
-
+    
     client.stop();
-    Serial.println("Client disconnected");
   }
 }
+

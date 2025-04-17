@@ -36,10 +36,10 @@ void setup() {
   matrix.begin();
   lcd.init();
   lcd.backlight();
-  lcd.setCursor(4, 1);
-  lcd.print("PharmAssist");
+  lcd.setCursor(0, 1);
+  lcd.print("    PharmAssist");
 
-  delay(1000);
+  delay(3000);
   isInitialized = EEPROM.read(isInitializedAddress);
 
   if (isInitialized != 1) {
