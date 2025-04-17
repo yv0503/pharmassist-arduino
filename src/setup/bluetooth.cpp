@@ -46,7 +46,7 @@ void onJsonReceived(BLEDevice central, BLECharacteristic characteristic) {
 
     if (ssidPtr->length() > 0 && passwordPtr->length() > 0) {
       saveWiFiCredentials(*ssidPtr, *passwordPtr);
-      EEPROM.write(isInitializedAddress, 1);
+      EEPROM.update(isInitializedAddress, 1);
       setupComplete = true;
 
       // Send confirmation response back
@@ -94,20 +94,16 @@ void setupBluetooth(String &ssid, String &password) {
     while (true);
   }
 
-  // Make device discoverable
   BLE.setDeviceName(DEVICE_NAME.c_str());
   BLE.setLocalName(DEVICE_NAME.c_str());
   BLE.setAdvertisedService(bluetoothService);
 
-  // Add the JSON characteristic
   bluetoothService.addCharacteristic(wifiJsonCharacteristic);
 
-  // Set up the event handlers
   wifiJsonCharacteristic.setEventHandler(BLEWritten, onJsonReceived);
   BLE.setEventHandler(BLEDisconnected, onBLEDisconnected);
   BLE.setEventHandler(BLEConnected, onBLEConnected);
 
-  // Add service and start advertising
   BLE.addService(bluetoothService);
   BLE.advertise();
 
@@ -135,13 +131,13 @@ void runBluetoothSetup(String &ssid, String &password, ArduinoLEDMatrix &matrix,
   matrix.loadFrame(bluetooth_matrix[0]);
   
   lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("WiFi Setup Mode");
-  lcd.setCursor(0, 1);
+  lcd.setCursor(2, 0);
+  lcd.print("Wi-Fi Setup Mode");
+  lcd.setCursor(1, 1);
   lcd.print("Connect to device:");
-  lcd.setCursor(0, 2);
+  lcd.setCursor(4, 2);
   lcd.print(DEVICE_NAME);
-  lcd.setCursor(0, 3);
+  lcd.setCursor(3, 3);
   lcd.print("via Bluetooth");
 
   bool wasConnected = false;
@@ -163,18 +159,18 @@ void runBluetoothSetup(String &ssid, String &password, ArduinoLEDMatrix &matrix,
         matrix.loadFrame(bluetooth_matrix[currentFrame]);
         
         if (currentFrame == 0) {
-          lcd.setCursor(0, 3);
-          lcd.print("Waiting...        ");
+          lcd.setCursor(3, 3);
+          lcd.print("  Waiting...      ");
         } else {
-          lcd.setCursor(0, 3);
+          lcd.setCursor(3, 3);
           lcd.print("via Bluetooth     ");
         }
       } else if (!wasConnected) {
         matrix.loadFrame(bluetooth_matrix[1]);
         lcd.setCursor(0, 2);
-        lcd.print("Device connected  ");
+        lcd.print("  Device connected  ");
         lcd.setCursor(0, 3);
-        lcd.print("Waiting for config");
+        lcd.print(" Waiting for config");
         wasConnected = true;
       }
     }
@@ -182,19 +178,19 @@ void runBluetoothSetup(String &ssid, String &password, ArduinoLEDMatrix &matrix,
     if (!isConnected && wasConnected) {
       wasConnected = false;
       lcd.setCursor(0, 2);
-      lcd.print(DEVICE_NAME);
+      lcd.print("    " + DEVICE_NAME + "    ");
       lcd.setCursor(0, 3);
-      lcd.print("Disconnected      ");
+      lcd.print("   Disconnected    ");
       delay(1000);
       lcd.setCursor(0, 3);
-      lcd.print("via Bluetooth     ");
+      lcd.print("   via Bluetooth    ");
     }
   }
 
   // Setup complete
   lcd.clear();
   lcd.setCursor(0, 1);
-  lcd.print("WiFi Setup Complete");
+  lcd.print("Wi-Fi Setup Complete");
   lcd.setCursor(0, 2);
   lcd.print("Connecting to WiFi...");
 

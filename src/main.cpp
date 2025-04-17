@@ -12,8 +12,6 @@
 
 // Arduino UNO R4 WiFi
 
-#define resetPin 12
-
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 ArduinoLEDMatrix matrix;
 byte isInitialized = 0;
@@ -64,7 +62,7 @@ void setup() {
   if (wifiStatus != WL_CONNECTED) {
     Serial.println("WiFi connection failed after 3 attempts. Restarting Bluetooth setup...");
 
-    EEPROM.write(isInitializedAddress, 0);
+    EEPROM.update(isInitializedAddress, 0);
 
     runBluetoothSetup(ssid, password, matrix, lcd);
 
@@ -90,7 +88,7 @@ void loop() {
   }
 
   if (wifiStatus == WL_CONNECTED) {
-    handleWebServerClients();
+    handleWebServerClients(lcd);
   }
 }
 

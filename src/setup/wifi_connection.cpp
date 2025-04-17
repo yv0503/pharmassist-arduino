@@ -47,7 +47,7 @@ int connectToWiFi(const String &ssid, const String &password, ArduinoLEDMatrix &
 
   if (wifiStatus == WL_CONNECTED) {
     delay(1000L);
-    Serial.println("Connected to WiFi");
+    Serial.println("Connected to Wi-Fi");
     Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
     Serial.print("Signal strength (RSSI): ");
@@ -56,7 +56,7 @@ int connectToWiFi(const String &ssid, const String &password, ArduinoLEDMatrix &
 
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("WiFi Connected!");
+    lcd.print("  Wi-Fi Connected!  ");
     lcd.setCursor(0, 1);
     lcd.print("IP: ");
     lcd.print(WiFi.localIP());

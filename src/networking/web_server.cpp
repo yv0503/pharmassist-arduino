@@ -12,7 +12,7 @@ void setupWebServer() {
   Serial.println("Web server started");
 }
 
-void handleWebServerClients() {
+void handleWebServerClients(LiquidCrystal_I2C &lcd) {
   if (WiFiClient client = server.available()) {
     Serial.print("New client connected: ");
     Serial.println(client.remoteIP());
@@ -23,16 +23,19 @@ void handleWebServerClients() {
       if (client.available()) {
         if (const char c = client.read(); c == '\n') {
           if (currentLine.length() == 0) {
-            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-            // and a content-type so the client knows what's coming, then a blank line:
             client.println("HTTP/1.1 200 OK");
             client.println("Content-type:text/html");
             client.println();
 
             if (isResetRequested) {
-              EEPROM.write(isInitializedAddress, 0);
+              EEPROM.update(isInitializedAddress, 0);
               digitalWrite(LED_BUILTIN, LOW);
               Serial.println("Factory reset performed");
+              lcd.clear();
+              lcd.setCursor(0, 1);
+              lcd.print(" Factory reset done");
+              lcd.setCursor(0, 2);
+              lcd.print("  Restart Required");
 
               client.println(HTML_RESET_CONTENT);
 
@@ -43,12 +46,12 @@ void handleWebServerClients() {
 
             client.println();
             break;
-          } else {
-            if (currentLine.startsWith("GET /reset")) {
-              isResetRequested = true;
-            }
-            currentLine = "";
           }
+
+          if (currentLine.startsWith("GET /reset")) {
+            isResetRequested = true;
+          }
+          currentLine = "";
         } else if (c != '\r') {
           currentLine += c;
         }

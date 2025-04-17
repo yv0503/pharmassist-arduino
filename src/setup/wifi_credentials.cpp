@@ -4,17 +4,17 @@
 #include "wifi_credentials.h"
 
 void saveWiFiCredentials(const String &ssid, const String &password) {
-    EEPROM.write(isInitializedAddress, 1);
+    EEPROM.update(isInitializedAddress, 1);
 
     for (int i = 0; i < ssid.length(); i++) {
-        EEPROM.write(ssidStartAddress + i, ssid[i]);
+        EEPROM.update(ssidStartAddress + i, ssid[i]);
     }
-    EEPROM.write(ssidStartAddress + ssid.length(), 0); // Null terminator
+    EEPROM.update(ssidStartAddress + ssid.length(), 0);
 
     for (int i = 0; i < password.length(); i++) {
-        EEPROM.write(passwordStartAddress + i, password[i]);
+        EEPROM.update(passwordStartAddress + i, password[i]);
     }
-    EEPROM.write(passwordStartAddress + password.length(), 0); // Null terminator
+    EEPROM.update(passwordStartAddress + password.length(), 0);
 
     Serial.println("WiFi credentials saved to EEPROM");
 }
