@@ -79,6 +79,10 @@ void setup() {
   delay(3000);
   matrix.clear();
   digitalWrite(LED_BUILTIN, HIGH);
+  delay(3000L);
+  lcd.clear();
+  lcd.setCursor(0, 1);
+  lcd.print("    PharmAssist");
 }
 
 void loop() {

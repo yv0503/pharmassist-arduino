@@ -12,12 +12,14 @@ struct ApiResponse {
 
 class ApiHandler {
 public:
-  static ApiResponse processRequest(const String& endpoint, const String& method, LiquidCrystal_I2C& lcd);
+
+  static ApiResponse processRequest(const String& endpoint, const String& method, const String& requestBody, LiquidCrystal_I2C& lcd);
 
 private:
   static ApiResponse handleReset(LiquidCrystal_I2C& lcd);
   static ApiResponse handleHelloWorld(LiquidCrystal_I2C& lcd);
   static ApiResponse handleDisplayName(LiquidCrystal_I2C& lcd);
+  static ApiResponse handleDisplayMessage(LiquidCrystal_I2C& lcd, const String& requestBodyStr);
 };
 
 #endif

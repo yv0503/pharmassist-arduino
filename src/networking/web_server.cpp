@@ -19,6 +19,9 @@ void handleWebServerClients(LiquidCrystal_I2C &lcd) {
     String currentLine = "";
     String method = "";
     String endpoint = "";
+    String requestBody = "";
+    
+    int contentLength = 0;
 
     unsigned long timeout = millis();
     while (client.connected() && millis() - timeout < 2000) {
@@ -27,9 +30,20 @@ void handleWebServerClients(LiquidCrystal_I2C &lcd) {
 
         if (const char c = client.read(); c == '\n') {
           if (currentLine.length() == 0) {
+            if (contentLength > 0 && (method == "POST" || method == "PUT")) {
+              int bodyBytesRead = 0;
+              while (bodyBytesRead < contentLength && client.available() && millis() - timeout < 2000) {
+                const char ch = client.read();
+                requestBody += ch;
+                bodyBytesRead++;
+                timeout = millis();
+              }
+              Serial.print("Request body: ");
+              Serial.println(requestBody);
+            }
 
             if (endpoint.startsWith("/api/")) {
-              auto [statusCode, contentType, body] = ApiHandler::processRequest(endpoint, method, lcd);
+              auto [statusCode, contentType, body] = ApiHandler::processRequest(endpoint, method, requestBody, lcd);
 
               client.print("HTTP/1.1 ");
               client.print(statusCode);
@@ -59,6 +73,10 @@ void handleWebServerClients(LiquidCrystal_I2C &lcd) {
             if (const int queryStart = endpoint.indexOf('?'); queryStart != -1) {
               endpoint = endpoint.substring(0, queryStart);
             }
+          } else if (currentLine.startsWith("Content-Length: ")) {
+            contentLength = currentLine.substring(16).toInt();
+            Serial.print("Content Length: ");
+            Serial.println(contentLength);
           }
           currentLine = "";
         } else if (c != '\r') {
@@ -70,4 +88,3 @@ void handleWebServerClients(LiquidCrystal_I2C &lcd) {
     client.stop();
   }
 }
-
