@@ -20,6 +20,8 @@ ApiResponse ApiHandler::processRequest(const String& endpoint, const String& met
 
   if (method == "GET") {
     switch (hash(endpoint.c_str())) {
+      case "/api/status_check"_hash:
+        return handleStatusCheck();
       case "/api/hello_world"_hash:
         return handleHelloWorld(lcd);
       case "/api/display_name"_hash:
@@ -49,6 +51,15 @@ ApiResponse ApiHandler::processRequest(const String& endpoint, const String& met
   serializeJson(message, response.body);
   
   return response;
+}
+
+ApiResponse ApiHandler::handleStatusCheck() {
+  ApiResponse response;
+  response.statusCode = 200;
+  response.contentType = "text/plain";
+  response.body = "PharmAssist is running and ready to assist!";
+
+  return  response;
 }
 
 ApiResponse ApiHandler::handleReset(LiquidCrystal_I2C& lcd) {
