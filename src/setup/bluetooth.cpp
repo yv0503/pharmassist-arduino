@@ -13,15 +13,19 @@
 BLEService bluetoothService(WIFI_SERVICE_UUID.c_str());
 BLEStringCharacteristic wifiJsonCharacteristic(WIFI_JSON_CHARACTERISTIC_UUID.c_str(), BLEWrite | BLERead,
                                                JSON_BUFFER_SIZE);
+BLEStringCharacteristic wifiStatusCharacteristic(WIFI_STATUS_CHARACTERISTIC_UUID.c_str(), BLERead | BLENotify,
+                                                JSON_BUFFER_SIZE);
+BLEStringCharacteristic wifiAckCharacteristic(WIFI_ACK_CHARACTERISTIC_UUID.c_str(), BLEWrite | BLERead,
+                                             JSON_BUFFER_SIZE);
 
 // References to external variables
 String *ssidPtr = nullptr;
 String *passwordPtr = nullptr;
 bool setupComplete = false;
+extern bool isDeviceAcknowledged;
 
 // ReSharper disable CppParameterNeverUsed
-void onJsonReceived(BLEDevice central, BLECharacteristic characteristic) {
-  // NOLINT(*-unnecessary-value-param)
+void onJsonReceived(BLEDevice central, BLECharacteristic characteristic) { // NOLINT(*-unnecessary-value-param)
   String jsonStr = wifiJsonCharacteristic.value();
   Serial.print("Received JSON: ");
   Serial.println(jsonStr);
@@ -49,7 +53,6 @@ void onJsonReceived(BLEDevice central, BLECharacteristic characteristic) {
       EEPROM.update(isInitializedAddress, 1);
       setupComplete = true;
 
-      // Send confirmation response back
       JsonDocument response;
       response["status"] = "success";
       String responseStr;
@@ -65,16 +68,34 @@ void onJsonReceived(BLEDevice central, BLECharacteristic characteristic) {
   }
 }
 
+void onAckReceived(BLEDevice central, BLECharacteristic characteristic) { // NOLINT(*-unnecessary-value-param)
+  String ackStr = wifiAckCharacteristic.value();
+  Serial.print("Received Acknowledgment: ");
+  Serial.println(ackStr);
+
+  JsonDocument doc;
+  const DeserializationError error = deserializeJson(doc, ackStr);
+
+  if (error) {
+    Serial.print("JSON parsing failed: ");
+    Serial.println(error.c_str());
+    return;
+  }
+
+  if (!doc["acknowledged"].isNull() && doc["acknowledged"].as<bool>()) {
+    isDeviceAcknowledged = true;
+    Serial.println("Device acknowledged WiFi status");
+  }
+}
+
 // ReSharper disable once CppPassValueParameterByConstReference
-void onBLEConnected(BLEDevice central) {
-  // NOLINT(*-unnecessary-value-param)
+void onBLEConnected(BLEDevice central) { // NOLINT(*-unnecessary-value-param)
   Serial.print("Connected to central: ");
   Serial.println(central.address());
 }
 
 // ReSharper disable once CppPassValueParameterByConstReference
-void onBLEDisconnected(BLEDevice central) {
-  // NOLINT(*-unnecessary-value-param)
+void onBLEDisconnected(BLEDevice central) { // NOLINT(*-unnecessary-value-param)
   Serial.print("Disconnected from central: ");
   Serial.println(central.address());
 
@@ -84,13 +105,20 @@ void onBLEDisconnected(BLEDevice central) {
   }
 }
 
-void setupBluetooth(String &ssid, String &password) {
+void setupBluetooth(String &ssid, String &password, LiquidCrystal_I2C &lcd) {
   ssidPtr = &ssid;
   passwordPtr = &password;
   setupComplete = false;
 
   if (!BLE.begin()) {
     Serial.println("Starting Bluetooth® Low Energy module failed!");
+    lcd.clear();
+    lcd.setCursor(0, 1);
+    lcd.print("Bluetooth init failed");
+    lcd.setCursor(0, 2);
+    lcd.print("Restart your device.");
+
+    // ReSharper disable once CppDFAEndlessLoop
     while (true);
   }
 
@@ -99,8 +127,11 @@ void setupBluetooth(String &ssid, String &password) {
   BLE.setAdvertisedService(bluetoothService);
 
   bluetoothService.addCharacteristic(wifiJsonCharacteristic);
+  bluetoothService.addCharacteristic(wifiStatusCharacteristic);
+  bluetoothService.addCharacteristic(wifiAckCharacteristic);
 
   wifiJsonCharacteristic.setEventHandler(BLEWritten, onJsonReceived);
+  wifiAckCharacteristic.setEventHandler(BLEWritten, onAckReceived);
   BLE.setEventHandler(BLEDisconnected, onBLEDisconnected);
   BLE.setEventHandler(BLEConnected, onBLEConnected);
 
@@ -110,13 +141,33 @@ void setupBluetooth(String &ssid, String &password) {
   Serial.println("Bluetooth® device active, waiting for connections...");
 }
 
+void broadcastWiFiStatus(const int status, const String &message, const String &ipAddress) {
+  JsonDocument doc;
+  doc["status"] = status;
+  doc["message"] = message;
+  doc["ip"] = ipAddress;
+  
+  String statusStr;
+  serializeJson(doc, statusStr);
+  
+  wifiStatusCharacteristic.writeValue(statusStr);
+  Serial.print("Broadcasting WiFi status: ");
+  Serial.println(statusStr);
+}
+
 void bluetoothLoop() {
   BLE.poll();
 
-  if (setupComplete) {
+  if (setupComplete && isDeviceAcknowledged) {
     delay(1000);
     BLE.stopAdvertise();
   }
+}
+
+void closeBluetooth() {
+  BLE.stopAdvertise();
+  BLE.end();
+  Serial.println("Bluetooth connection closed");
 }
 
 bool isBleConnected() {
@@ -125,7 +176,7 @@ bool isBleConnected() {
 
 void runBluetoothSetup(String &ssid, String &password, ArduinoLEDMatrix &matrix, LiquidCrystal_I2C &lcd) {
   Serial.println("Starting Bluetooth setup...");
-  setupBluetooth(ssid, password);
+  setupBluetooth(ssid, password, lcd);
 
   matrix.begin();
   matrix.loadFrame(bluetooth_matrix[0]);
@@ -193,9 +244,4 @@ void runBluetoothSetup(String &ssid, String &password, ArduinoLEDMatrix &matrix,
   lcd.print("Wi-Fi Setup Complete");
   lcd.setCursor(0, 2);
   lcd.print("Connecting to WiFi...");
-
-  BLE.end();
-  Serial.println("Bluetooth setup complete");
-  matrix.clear();
 }
-

@@ -15,6 +15,7 @@
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 ArduinoLEDMatrix matrix;
 byte isInitialized = 0;
+bool isDeviceAcknowledged = false;
 
 String ssid = "";
 String password = "";
@@ -44,6 +45,8 @@ void setup() {
 
   if (isInitialized != 1) {
     runBluetoothSetup(ssid, password, matrix, lcd);
+  } else {
+    setupBluetooth(ssid, password, lcd);
   }
 
   loadWiFiCredentials(ssid, password);
@@ -74,6 +77,25 @@ void setup() {
     setupWebServer();
     Serial.print("Web server available at http://");
     Serial.println(WiFi.localIP());
+    
+    broadcastWiFiStatus(wifiStatus, "Connected successfully", WiFi.localIP().toString());
+  } else {
+    broadcastWiFiStatus(wifiStatus, "Failed to connect", "0.0.0.0");
+  }
+
+  // Wait for BLE acknowledgment with a 30-second timeout
+  const unsigned long acknowledgmentTimeoutStart = millis();
+  Serial.println("Waiting for device to acknowledge WiFi status (30s timeout)...");
+  while (!isDeviceAcknowledged && millis() - acknowledgmentTimeoutStart < 15000) {
+    bluetoothLoop();
+    delay(100);
+  }
+
+  if (isDeviceAcknowledged) {
+    Serial.println("Device acknowledged WiFi status. Closing Bluetooth.");
+    closeBluetooth();
+  } else {
+    Serial.println("No acknowledgment received after timeout. Keeping Bluetooth active.");
   }
 
   delay(3000);
@@ -93,6 +115,11 @@ void loop() {
 
   if (wifiStatus == WL_CONNECTED) {
     handleWebServerClients(lcd);
+  }
+
+  // Continue polling Bluetooth if not yet acknowledged
+  if (!isDeviceAcknowledged) {
+    bluetoothLoop();
   }
 }
 
