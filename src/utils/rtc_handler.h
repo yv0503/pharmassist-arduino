@@ -17,6 +17,7 @@ public:
     String getFormattedTime();
     String getFormattedDate();
     String getFormattedDateTime();
+    String getFormattedWeekDay();
     
     void setTimeFromEpoch(unsigned long epochSeconds);
     unsigned long getEpochTime();

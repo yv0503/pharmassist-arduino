@@ -30,7 +30,7 @@ bool RTCHandler::isRunning() {
 
 String RTCHandler::getFormattedTime() {
     const Ds1302::DateTime now = getCurrentDateTime();
-    
+
     String timeStr = "";
     
     if (now.hour < 10) timeStr += "0";
@@ -41,21 +41,19 @@ String RTCHandler::getFormattedTime() {
     
     if (now.second < 10) timeStr += "0";
     timeStr += String(now.second);
-    
+
     return timeStr;
 }
 
 String RTCHandler::getFormattedDate() {
     const Ds1302::DateTime now = getCurrentDateTime();
+    const String months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
     
     String dateStr = "";
     
     if (now.day < 10) dateStr += "0";
-    dateStr += String(now.day) + "/";
-    
-    if (now.month < 10) dateStr += "0";
-    dateStr += String(now.month) + "/";
-    
+    dateStr += String(now.day) + " ";
+    dateStr += months[now.month - 1] + " ";
     dateStr += "20" + String(now.year);  // Assuming 20xx years
     
     return dateStr;
@@ -63,6 +61,12 @@ String RTCHandler::getFormattedDate() {
 
 String RTCHandler::getFormattedDateTime() {
     return getFormattedDate() + " " + getFormattedTime();
+}
+
+String RTCHandler::getFormattedWeekDay() {
+    const Ds1302::DateTime now = getCurrentDateTime();
+    const String daysOfWeek[] = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+    return daysOfWeek[now.dow - 1];
 }
 
 void RTCHandler::setTimeFromEpoch(const unsigned long epochSeconds) {

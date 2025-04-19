@@ -11,7 +11,7 @@ void setupWebServer() {
   Serial.println("Web server started");
 }
 
-void handleWebServerClients(LiquidCrystal_I2C &lcd, RTCHandler &rtcHandler) {
+void handleWebServerClients(LiquidCrystal_I2C &lcd, RTCHandler &rtcHandler, bool &isDeviceAcknowledged) {
   if (WiFiClient client = server.available()) {
     Serial.print("New client connected: ");
     Serial.println(client.remoteIP());
@@ -44,7 +44,7 @@ void handleWebServerClients(LiquidCrystal_I2C &lcd, RTCHandler &rtcHandler) {
 
             if (endpoint.startsWith("/api/")) {
               auto [statusCode, contentType, body] =
-                ApiHandler::processRequest(endpoint, method, requestBody, lcd, rtcHandler);
+                ApiHandler::processRequest(endpoint, method, requestBody, isDeviceAcknowledged, lcd, rtcHandler);
 
               client.print("HTTP/1.1 ");
               client.print(statusCode);

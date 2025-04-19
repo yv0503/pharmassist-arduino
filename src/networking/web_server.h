@@ -8,6 +8,6 @@
 
 void setupWebServer();
 
-void handleWebServerClients(LiquidCrystal_I2C &lcd, RTCHandler &rtcHandler);
+void handleWebServerClients(LiquidCrystal_I2C &lcd, RTCHandler &rtcHandler, bool &isDeviceAcknowledged);
 
 #endif

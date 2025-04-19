@@ -61,9 +61,7 @@ int connectToWiFi(const String &ssid, const String &password, ArduinoLEDMatrix &
     lcd.print("IP: ");
     lcd.print(WiFi.localIP());
     lcd.setCursor(0, 2);
-    lcd.print("RSSI: ");
-    lcd.print(WiFi.RSSI());
-    lcd.print(" dBm");
+    lcd.print("Waiting for app...");
 
     Serial.print("Testing internet connection... ");
     const String testServer = "www.google.com";

@@ -9,12 +9,13 @@
 #include "utils/string_hash.h"
 
 ApiResponse ApiHandler::processRequest(
-  const String& endpoint,
-  const String& method,
-  const String& requestBody,
-  LiquidCrystal_I2C& lcd,
-  RTCHandler& rtcHandler
-  ) {
+  const String &endpoint,
+  const String &method,
+  const String &requestBody,
+  bool &isDeviceAcknowledged,
+  LiquidCrystal_I2C &lcd,
+  RTCHandler &rtcHandler
+) {
   Serial.print("API Request: ");
   Serial.print(method);
   Serial.print(" ");
@@ -28,7 +29,7 @@ ApiResponse ApiHandler::processRequest(
   if (method == "GET") {
     switch (hash(endpoint.c_str())) {
       case "/api/status_check"_hash:
-        return handleStatusCheck();
+        return handleStatusCheck(isDeviceAcknowledged);
       case "/api/hello_world"_hash:
         return handleHelloWorld(lcd);
       case "/api/display_name"_hash:
@@ -46,6 +47,8 @@ ApiResponse ApiHandler::processRequest(
         return handleDisplayMessage(lcd, requestBody);
       case "/api/set_time"_hash:
         return handleSetTime(requestBody, rtcHandler);
+      case "/api/acknowledge"_hash:
+        return handleAcknowledge(isDeviceAcknowledged);
       default:
         break;
     }
@@ -62,11 +65,37 @@ ApiResponse ApiHandler::processRequest(
   return response;
 }
 
-ApiResponse ApiHandler::handleStatusCheck() {
+ApiResponse ApiHandler::handleAcknowledge(bool &isDeviceAcknowledged) {
+  isDeviceAcknowledged = true;
+
   ApiResponse response;
   response.statusCode = 200;
-  response.contentType = "text/plain";
-  response.body = "PharmAssist is running and ready to assist!";
+  response.contentType = "application/json";
+
+  JsonDocument message;
+  message["status"] = "success";
+  message["message"] = "Device acknowledged successfully.";
+  serializeJson(message, response.body);
+
+  return response;
+}
+
+ApiResponse ApiHandler::handleStatusCheck(const bool &isDeviceAcknowledged) {
+  ApiResponse response;
+  response.statusCode = 200;
+  response.contentType = "application/json";
+
+  JsonDocument message;
+
+  if (isDeviceAcknowledged) {
+    message["status"] = "success";
+    message["message"] = "PharmAssist is running and ready to assist!";
+  } else {
+    message["status"] = "needs_acknowledgement";
+    message["message"] = "PharmAssist is running but needs Bluetooth acknowledgment.";
+  }
+
+  serializeJson(message, response.body);
 
   return  response;
 }

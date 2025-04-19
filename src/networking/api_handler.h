@@ -14,11 +14,18 @@ struct ApiResponse {
 
 class ApiHandler {
 public:
-
-  static ApiResponse processRequest(const String &endpoint, const String &method, const String &requestBody, LiquidCrystal_I2C &lcd, RTCHandler &rtcHandler);
+  static ApiResponse processRequest(
+    const String &endpoint,
+    const String &method,
+    const String &requestBody,
+    bool &isDeviceAcknowledged,
+    LiquidCrystal_I2C &lcd,
+    RTCHandler &rtcHandler
+  );
 
 private:
-  static ApiResponse handleStatusCheck();
+  static ApiResponse handleAcknowledge(bool &isDeviceAcknowledged);
+  static ApiResponse handleStatusCheck(const bool &isDeviceAcknowledged);
   static ApiResponse handleReset(LiquidCrystal_I2C& lcd);
   static ApiResponse handleHelloWorld(LiquidCrystal_I2C& lcd);
   static ApiResponse handleDisplayName(LiquidCrystal_I2C& lcd);

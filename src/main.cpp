@@ -88,9 +88,9 @@ void setup() {
     Serial.print("Web server available at http://");
     Serial.println(WiFi.localIP());
 
-    broadcastWiFiStatus(wifiStatus, "Connected successfully", WiFi.localIP().toString());
+    broadcastWiFiStatus(wifiStatus, "Connected successfully.", WiFi.localIP().toString());
   } else {
-    broadcastWiFiStatus(wifiStatus, "Failed to connect", "0.0.0.0");
+    broadcastWiFiStatus(wifiStatus, "Failed to connect.", "0.0.0.0");
   }
 
   // Wait for BLE acknowledgment with a 30-second timeout
@@ -101,6 +101,8 @@ void setup() {
     // ReSharper restore CppDFALoopConditionNotUpdated
     bluetoothLoop();
     delay(100);
+    if (wifiStatus == WL_CONNECTED)
+      handleWebServerClients(lcd, rtcHandler, isDeviceAcknowledged);
   }
 
   if (isDeviceAcknowledged) {
@@ -115,7 +117,7 @@ void setup() {
   digitalWrite(LED_BUILTIN, HIGH);
   delay(3000L);
   lcd.clear();
-  lcd.setCursor(0, 1);
+  lcd.setCursor(0, 0);
   lcd.print("    PharmAssist");
 }
 
@@ -126,18 +128,22 @@ void loop() {
   }
 
   if (wifiStatus == WL_CONNECTED) {
-    handleWebServerClients(lcd, rtcHandler);
+    handleWebServerClients(lcd, rtcHandler, isDeviceAcknowledged);
   }
 
   if (const unsigned long currentMillis = millis(); currentMillis - lastTimeUpdateMillis >= timeUpdateInterval) {
     lastTimeUpdateMillis = currentMillis;
 
-    lcd.setCursor(0, 2);
-    lcd.print("   Time: ");
-
     const String formattedTime = rtcHandler.getFormattedTime();
-    lcd.print(formattedTime);
+    const String formattedWeekDay = rtcHandler.getFormattedWeekDay();
+    const String formattedDate = rtcHandler.getFormattedDate();
+
+    lcd.setCursor(0, 2);
+    lcd.print("  " + formattedWeekDay + ", " + formattedDate);
     lcd.print("    ");
+
+    lcd.setCursor(0, 3);
+    lcd.print("      " + formattedTime);
   }
 
   if (!isDeviceAcknowledged) {
