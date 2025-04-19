@@ -9,9 +9,15 @@
 #include "setup/bluetooth.h"
 #include "setup/wifi_connection.h"
 #include "networking/web_server.h"
+#include "utils/rtc_handler.h"
 
 // Arduino UNO R4 WiFi
 
+#define PIN_CLK 5
+#define PIN_DAT 4
+#define PIN_RST 2
+
+RTCHandler rtcHandler(PIN_RST, PIN_CLK, PIN_DAT);
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 ArduinoLEDMatrix matrix;
 byte isInitialized = 0;
@@ -28,6 +34,9 @@ const String testServer = "www.google.com";
 int wifiStatus = WL_IDLE_STATUS;
 int failedAttempts = 0;
 
+unsigned long lastTimeUpdateMillis = 0;
+constexpr unsigned long timeUpdateInterval = 1000;
+
 void setup() {
   Serial.begin(9600);
   Serial.println("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓");
@@ -39,6 +48,8 @@ void setup() {
   lcd.backlight();
   lcd.setCursor(0, 1);
   lcd.print("    PharmAssist");
+
+  rtcHandler.initialize();
 
   delay(3000);
   isInitialized = EEPROM.read(isInitializedAddress);
@@ -61,7 +72,6 @@ void setup() {
     wifiStatus = connectToWiFi(ssid, password, matrix, lcd);
   }
 
-  // If still failed after 3 attempts, restart Bluetooth setup
   if (wifiStatus != WL_CONNECTED) {
     Serial.println("WiFi connection failed after 3 attempts. Restarting Bluetooth setup...");
 
@@ -77,7 +87,7 @@ void setup() {
     setupWebServer();
     Serial.print("Web server available at http://");
     Serial.println(WiFi.localIP());
-    
+
     broadcastWiFiStatus(wifiStatus, "Connected successfully", WiFi.localIP().toString());
   } else {
     broadcastWiFiStatus(wifiStatus, "Failed to connect", "0.0.0.0");
@@ -86,7 +96,9 @@ void setup() {
   // Wait for BLE acknowledgment with a 30-second timeout
   const unsigned long acknowledgmentTimeoutStart = millis();
   Serial.println("Waiting for device to acknowledge WiFi status (30s timeout)...");
+  // ReSharper disable CppDFALoopConditionNotUpdated
   while (!isDeviceAcknowledged && millis() - acknowledgmentTimeoutStart < 15000) {
+    // ReSharper restore CppDFALoopConditionNotUpdated
     bluetoothLoop();
     delay(100);
   }
@@ -114,12 +126,21 @@ void loop() {
   }
 
   if (wifiStatus == WL_CONNECTED) {
-    handleWebServerClients(lcd);
+    handleWebServerClients(lcd, rtcHandler);
   }
 
-  // Continue polling Bluetooth if not yet acknowledged
+  if (const unsigned long currentMillis = millis(); currentMillis - lastTimeUpdateMillis >= timeUpdateInterval) {
+    lastTimeUpdateMillis = currentMillis;
+
+    lcd.setCursor(0, 2);
+    lcd.print("   Time: ");
+
+    const String formattedTime = rtcHandler.getFormattedTime();
+    lcd.print(formattedTime);
+    lcd.print("    ");
+  }
+
   if (!isDeviceAcknowledged) {
     bluetoothLoop();
   }
 }
-

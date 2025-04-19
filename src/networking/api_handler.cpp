@@ -5,9 +5,16 @@
 #include <constants.h>
 #include "api_handler.h"
 
+#include "utils/rtc_handler.h"
 #include "utils/string_hash.h"
 
-ApiResponse ApiHandler::processRequest(const String& endpoint, const String& method, const String& requestBody, LiquidCrystal_I2C& lcd) {
+ApiResponse ApiHandler::processRequest(
+  const String& endpoint,
+  const String& method,
+  const String& requestBody,
+  LiquidCrystal_I2C& lcd,
+  RTCHandler& rtcHandler
+  ) {
   Serial.print("API Request: ");
   Serial.print(method);
   Serial.print(" ");
@@ -37,6 +44,8 @@ ApiResponse ApiHandler::processRequest(const String& endpoint, const String& met
         return handleReset(lcd);
       case "/api/display_message"_hash:
         return handleDisplayMessage(lcd, requestBody);
+      case "/api/set_time"_hash:
+        return handleSetTime(requestBody, rtcHandler);
       default:
         break;
     }
@@ -156,6 +165,49 @@ ApiResponse ApiHandler::handleDisplayMessage(LiquidCrystal_I2C &lcd, const Strin
   JsonDocument message;
   message["status"] = "success";
   message["message"] = "Message displayed on LCD";
+  serializeJson(message, response.body);
+  
+  return response;
+}
+
+ApiResponse ApiHandler::handleSetTime(const String &requestBodyStr, RTCHandler &rtcHandler) {
+  ApiResponse response;
+  response.contentType = "application/json";
+  
+  JsonDocument requestBody;
+  DeserializationError error = deserializeJson(requestBody, requestBodyStr);
+  
+  if (error) {
+    response.statusCode = 400;
+    
+    JsonDocument errorMessage;
+    errorMessage["error"] = "Invalid JSON";
+    errorMessage["message"] = error.c_str();
+    serializeJson(errorMessage, response.body);
+    return response;
+  }
+  
+  if (requestBody["epochTime"].isNull()) {
+    response.statusCode = 400;
+    
+    JsonDocument errorMessage;
+    errorMessage["error"] = "Missing required field";
+    errorMessage["message"] = "The 'epochTime' field is required.";
+    serializeJson(errorMessage, response.body);
+    return response;
+  }
+  
+  unsigned long epochTime = requestBody["epochTime"];
+
+  rtcHandler.setTimeFromEpoch(epochTime);
+  
+  response.statusCode = 200;
+  
+  JsonDocument message;
+  message["status"] = "success";
+  message["message"] = "Time set successfully";
+  message["currentTime"] = rtcHandler.getFormattedDateTime();
+  message["epochTime"] = rtcHandler.getEpochTime();
   serializeJson(message, response.body);
   
   return response;

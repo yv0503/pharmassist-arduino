@@ -4,6 +4,8 @@
 #include <WiFiS3.h>
 #include <LiquidCrystal_I2C.h>
 
+#include "utils/rtc_handler.h"
+
 struct ApiResponse {
   int statusCode;
   String contentType;
@@ -13,7 +15,7 @@ struct ApiResponse {
 class ApiHandler {
 public:
 
-  static ApiResponse processRequest(const String& endpoint, const String& method, const String& requestBody, LiquidCrystal_I2C& lcd);
+  static ApiResponse processRequest(const String &endpoint, const String &method, const String &requestBody, LiquidCrystal_I2C &lcd, RTCHandler &rtcHandler);
 
 private:
   static ApiResponse handleStatusCheck();
@@ -21,6 +23,7 @@ private:
   static ApiResponse handleHelloWorld(LiquidCrystal_I2C& lcd);
   static ApiResponse handleDisplayName(LiquidCrystal_I2C& lcd);
   static ApiResponse handleDisplayMessage(LiquidCrystal_I2C& lcd, const String& requestBodyStr);
+  static ApiResponse handleSetTime(const String &requestBodyStr, RTCHandler &rtcHandler);
 };
 
 #endif
