@@ -8,7 +8,12 @@
 #include <constants.h>
 #include "../led_matrix/bluetooth_matrix.h"
 #include "bluetooth.h"
+
+#include <WiFi.h>
+#include <WiFiTypes.h>
+
 #include "wifi_credentials.h"
+#include "utils/ip_handler.h"
 
 BLEService bluetoothService(WIFI_SERVICE_UUID.c_str());
 BLEStringCharacteristic wifiJsonCharacteristic(WIFI_JSON_CHARACTERISTIC_UUID.c_str(), BLEWrite | BLERead,
@@ -18,14 +23,16 @@ BLEStringCharacteristic wifiStatusCharacteristic(WIFI_STATUS_CHARACTERISTIC_UUID
 BLEStringCharacteristic wifiAckCharacteristic(WIFI_ACK_CHARACTERISTIC_UUID.c_str(), BLEWrite | BLERead,
                                              JSON_BUFFER_SIZE);
 
-// References to external variables
 String *ssidPtr = nullptr;
 String *passwordPtr = nullptr;
 bool setupComplete = false;
 extern bool isDeviceAcknowledged;
+bool bluetoothActive = false;
+unsigned long lastBluetoothActivityTime = 0;
 
 // ReSharper disable CppParameterNeverUsed
 void onJsonReceived(BLEDevice central, BLECharacteristic characteristic) { // NOLINT(*-unnecessary-value-param)
+  resetBluetoothTimeout();
   String jsonStr = wifiJsonCharacteristic.value();
   Serial.print("Received JSON: ");
   Serial.println(jsonStr);
@@ -69,6 +76,7 @@ void onJsonReceived(BLEDevice central, BLECharacteristic characteristic) { // NO
 }
 
 void onAckReceived(BLEDevice central, BLECharacteristic characteristic) { // NOLINT(*-unnecessary-value-param)
+  resetBluetoothTimeout();
   String ackStr = wifiAckCharacteristic.value();
   Serial.print("Received Acknowledgment: ");
   Serial.println(ackStr);
@@ -90,6 +98,7 @@ void onAckReceived(BLEDevice central, BLECharacteristic characteristic) { // NOL
 
 // ReSharper disable once CppPassValueParameterByConstReference
 void onBLEConnected(BLEDevice central) { // NOLINT(*-unnecessary-value-param)
+  resetBluetoothTimeout();
   Serial.print("Connected to central: ");
   Serial.println(central.address());
 }
@@ -102,6 +111,22 @@ void onBLEDisconnected(BLEDevice central) { // NOLINT(*-unnecessary-value-param)
   if (!setupComplete) {
     Serial.println("Setup was not completed. Restarting advertising...");
     BLE.advertise();
+    resetBluetoothTimeout();
+  }
+}
+
+void resetBluetoothTimeout() {
+  lastBluetoothActivityTime = millis();
+  Serial.println("Bluetooth timeout reset");
+}
+
+void checkBluetoothTimeout() {
+  if (!bluetoothActive || !isDeviceAcknowledged || isBleConnected())
+    return;
+    
+  if (millis() - lastBluetoothActivityTime > BLE_INACTIVITY_TIMEOUT_MS) {
+    Serial.println("Bluetooth inactivity timeout reached");
+    stopBluetooth();
   }
 }
 
@@ -110,6 +135,20 @@ void setupBluetooth(String &ssid, String &password, LiquidCrystal_I2C &lcd) {
   passwordPtr = &password;
   setupComplete = false;
 
+  startBluetooth(ssid, password, lcd);
+}
+
+void startBluetooth(String &ssid, String &password, LiquidCrystal_I2C &lcd) {
+  if (bluetoothActive) {
+    resetBluetoothTimeout();
+    return;
+  }
+  
+  ssidPtr = &ssid;
+  passwordPtr = &password;
+  
+  Serial.println("Starting Bluetooth...");
+  
   if (!BLE.begin()) {
     Serial.println("Starting Bluetooth® Low Energy module failed!");
     lcd.clear();
@@ -137,15 +176,45 @@ void setupBluetooth(String &ssid, String &password, LiquidCrystal_I2C &lcd) {
 
   BLE.addService(bluetoothService);
   BLE.advertise();
+  bluetoothActive = true;
+  resetBluetoothTimeout();
 
   Serial.println("Bluetooth® device active, waiting for connections...");
 }
 
-void broadcastWiFiStatus(const int status, const String &message, const String &ipAddress) {
+void stopBluetooth() {
+  if (bluetoothActive) {
+    BLE.stopAdvertise();
+    BLE.end();
+    bluetoothActive = false;
+    Serial.println("Bluetooth service completely stopped");
+  }
+}
+
+void broadcastWiFiStatus(const int status, const String &message, LiquidCrystal_I2C &lcd) {
+  if (!bluetoothActive && ssidPtr != nullptr) {
+    startBluetooth(*ssidPtr, *passwordPtr, lcd);
+  }
+
+  int statusCode = 0;
+  const IPAddress localIp = WiFi.localIP();
+
+  if (status == WL_CONNECTED) {
+    if (const IPAddress lastKnownIp = loadLastKnownIp(); isSameIp(lastKnownIp, localIp)) {
+      statusCode = 200;
+    } else {
+      statusCode = 300;
+    }
+
+  } else {
+    statusCode = 400;
+  }
+
+  resetBluetoothTimeout();
   JsonDocument doc;
-  doc["status"] = status;
+  doc["status"] = statusCode;
   doc["message"] = message;
-  doc["ip"] = ipAddress;
+  doc["ip"] = localIp.toString();
   
   String statusStr;
   serializeJson(doc, statusStr);
@@ -156,22 +225,39 @@ void broadcastWiFiStatus(const int status, const String &message, const String &
 }
 
 void bluetoothLoop() {
-  BLE.poll();
-
-  if (setupComplete && isDeviceAcknowledged) {
-    delay(1000);
-    BLE.stopAdvertise();
+  if (bluetoothActive) {
+    BLE.poll();
+    checkBluetoothTimeout();
   }
 }
 
 void closeBluetooth() {
-  BLE.stopAdvertise();
-  BLE.end();
-  Serial.println("Bluetooth connection closed");
+  if (bluetoothActive) {
+    BLE.stopAdvertise();
+    bluetoothActive = false;
+    Serial.println("Bluetooth advertising stopped but connection kept active");
+  }
 }
 
 bool isBleConnected() {
   return BLE.connected();
+}
+
+bool isBluetoothActive() {
+  return bluetoothActive;
+}
+
+void restartBleAdvertising(LiquidCrystal_I2C &lcd) {
+  if (!bluetoothActive && ssidPtr != nullptr) {
+    startBluetooth(*ssidPtr, *passwordPtr, lcd);
+    return;
+  }
+  
+  if (!BLE.advertise() && bluetoothActive) {
+    BLE.advertise();
+    resetBluetoothTimeout();
+    Serial.println("Restarted Bluetooth advertising");
+  }
 }
 
 void runBluetoothSetup(String &ssid, String &password, ArduinoLEDMatrix &matrix, LiquidCrystal_I2C &lcd) {
@@ -238,10 +324,10 @@ void runBluetoothSetup(String &ssid, String &password, ArduinoLEDMatrix &matrix,
     }
   }
 
-  // Setup complete
   lcd.clear();
   lcd.setCursor(0, 1);
   lcd.print("Wi-Fi Setup Complete");
   lcd.setCursor(0, 2);
   lcd.print("Connecting to WiFi...");
 }
+

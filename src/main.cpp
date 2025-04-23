@@ -10,15 +10,19 @@
 #include "setup/wifi_connection.h"
 #include "networking/web_server.h"
 #include "utils/rtc_handler.h"
+#include "utils/ip_handler.h"
 
 // Arduino UNO R4 WiFi
 
 #define PIN_CLK 5
 #define PIN_DAT 4
 #define PIN_RST 2
+#define LCD_ADDR 0x27
+#define LCD_COLUMNS 20
+#define LCD_ROWS 4
 
 RTCHandler rtcHandler(PIN_RST, PIN_CLK, PIN_DAT);
-LiquidCrystal_I2C lcd(0x27, 20, 4);
+LiquidCrystal_I2C lcd(LCD_ADDR, LCD_COLUMNS, LCD_ROWS);
 ArduinoLEDMatrix matrix;
 byte isInitialized = 0;
 bool isDeviceAcknowledged = false;
@@ -36,6 +40,12 @@ int failedAttempts = 0;
 
 unsigned long lastTimeUpdateMillis = 0;
 constexpr unsigned long timeUpdateInterval = 1000;
+
+unsigned long lastWifiCheckMillis = 0;
+constexpr unsigned long wifiCheckInterval = 60000;
+
+unsigned long lastBluetoothCheckMillis = 0;
+constexpr unsigned long bluetoothCheckInterval = 300000;
 
 void setup() {
   Serial.begin(9600);
@@ -57,7 +67,7 @@ void setup() {
   if (isInitialized != 1) {
     runBluetoothSetup(ssid, password, matrix, lcd);
   } else {
-    setupBluetooth(ssid, password, lcd);
+    startBluetooth(ssid, password, lcd);
   }
 
   loadWiFiCredentials(ssid, password);
@@ -87,15 +97,15 @@ void setup() {
     setupWebServer();
     Serial.print("Web server available at http://");
     Serial.println(WiFi.localIP());
-
-    broadcastWiFiStatus(wifiStatus, "Connected successfully.", WiFi.localIP().toString());
+    saveLastKnownIp(WiFi.localIP());
+    
+    broadcastWiFiStatus(wifiStatus, "Connected successfully.", WiFi.localIP().toString(), lcd);
   } else {
-    broadcastWiFiStatus(wifiStatus, "Failed to connect.", "0.0.0.0");
+    broadcastWiFiStatus(wifiStatus, "Failed to connect.", "0.0.0.0", lcd);
   }
 
-  // Wait for BLE acknowledgment with a 30-second timeout
   const unsigned long acknowledgmentTimeoutStart = millis();
-  Serial.println("Waiting for device to acknowledge WiFi status (30s timeout)...");
+  Serial.println("Waiting for device to acknowledge WiFi status (15s timeout)...");
   // ReSharper disable CppDFALoopConditionNotUpdated
   while (!isDeviceAcknowledged && millis() - acknowledgmentTimeoutStart < 15000) {
     // ReSharper restore CppDFALoopConditionNotUpdated
@@ -106,8 +116,7 @@ void setup() {
   }
 
   if (isDeviceAcknowledged) {
-    Serial.println("Device acknowledged WiFi status. Closing Bluetooth.");
-    closeBluetooth();
+    Serial.println("Device acknowledged WiFi status. Starting Bluetooth timeout.");
   } else {
     Serial.println("No acknowledgment received after timeout. Keeping Bluetooth active.");
   }
@@ -122,16 +131,34 @@ void setup() {
 }
 
 void loop() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi connection lost. Attempting to reconnect...");
-    wifiStatus = connectToWiFi(ssid, password, matrix, lcd);
+  const unsigned long currentMillis = millis();
+
+  if (currentMillis - lastWifiCheckMillis >= wifiCheckInterval) {
+    lastWifiCheckMillis = currentMillis;
+    
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("WiFi connection lost. Attempting to reconnect...");
+      wifiStatus = connectToWiFi(ssid, password, matrix, lcd);
+
+      if (wifiStatus != WL_CONNECTED && !isBluetoothActive()) {
+        startBluetooth(ssid, password, lcd);
+      }
+    }
+  }
+
+  if (currentMillis - lastBluetoothCheckMillis >= bluetoothCheckInterval) {
+    lastBluetoothCheckMillis = currentMillis;
+
+    if (!isBleConnected()) {
+      restartBleAdvertising(lcd);
+    }
   }
 
   if (wifiStatus == WL_CONNECTED) {
     handleWebServerClients(lcd, rtcHandler, isDeviceAcknowledged);
   }
 
-  if (const unsigned long currentMillis = millis(); currentMillis - lastTimeUpdateMillis >= timeUpdateInterval) {
+  if (currentMillis - lastTimeUpdateMillis >= timeUpdateInterval) {
     lastTimeUpdateMillis = currentMillis;
 
     const String formattedTime = rtcHandler.getFormattedTime();
@@ -146,7 +173,5 @@ void loop() {
     lcd.print("      " + formattedTime);
   }
 
-  if (!isDeviceAcknowledged) {
-    bluetoothLoop();
-  }
+  bluetoothLoop();
 }

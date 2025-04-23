@@ -1,96 +1,80 @@
+#include <Arduino.h>
+#include <WiFiS3.h>
+#include <Arduino_LED_Matrix.h>
+#include <LiquidCrystal_I2C.h>
+
+#include <utils/ip_handler.h>
+#include "../led_matrix/wifi_matrix.h"
+#include "bluetooth.h"
 #include "wifi_connection.h"
 
 int connectToWiFi(const String &ssid, const String &password, ArduinoLEDMatrix &matrix, LiquidCrystal_I2C &lcd) {
-  Serial.print("Connecting to WiFi network: ");
-  Serial.println(ssid);
-  Serial.println();
+  if (ssid.length() == 0) {
+    Serial.println("Error: SSID is empty");
+    return WL_CONNECT_FAILED;
+  }
 
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Connecting to WiFi");
+  lcd.print("    Connecting to");
   lcd.setCursor(0, 1);
-  lcd.print(ssid);
+  lcd.print("       Wi-Fi");
+  lcd.setCursor(0, 2);
+  lcd.print("      " + ssid);
 
-  WiFi.begin(ssid.c_str(), password.c_str());
-  unsigned long previousMillis = 0;
-  const unsigned long connectionStartTime = millis();
+  matrix.begin();
+  matrix.loadFrame(wifi_matrix[0]);
+
+  WiFi.disconnect();
+  delay(100);
+  
+  int status = WL_IDLE_STATUS;
+  int attempt = 0;
+  constexpr int maxAttempts = 10;
   byte currentFrame = 0;
-  int wifiStatus = WL_IDLE_STATUS;
-
-  while (wifiStatus != WL_CONNECTED) {
-    wifiStatus = WiFi.status();
-
-    if (const unsigned long currentMillis = millis(); currentMillis - previousMillis >= 500) {
-      previousMillis = currentMillis;
-      matrix.loadFrame(wifi_matrix[currentFrame]);
-      currentFrame = (currentFrame + 1) % 4;
-
-      lcd.setCursor(0, 2);
-      lcd.print("Connecting");
-      for (int i = 0; i < currentFrame + 1; i++) {
-        lcd.print(".");
-      }
-      lcd.print("   ");
-    }
-
-    if (wifiStatus == WL_CONNECT_FAILED) {
-      Serial.println("WiFi connection failed - invalid credentials or network issues");
-      break;
-    }
-
-    if (constexpr unsigned long CONNECTION_TIMEOUT = 5000; millis() - connectionStartTime > CONNECTION_TIMEOUT) {
-      Serial.println("WiFi connection timeout");
-      wifiStatus = WL_CONNECTION_LOST;
-      break;
-    }
+  
+  Serial.print("Attempting to connect to SSID: ");
+  Serial.println(ssid);
+  
+  WiFi.begin(ssid.c_str(), password.c_str());
+  
+  while (status != WL_CONNECTED && attempt < maxAttempts) {
+    delay(1000);
+    status = WiFi.status();
+    Serial.print("WiFi status: ");
+    Serial.println(status);
+    currentFrame = 1 - currentFrame;
+    matrix.loadFrame(wifi_matrix[currentFrame]);
+    attempt++;
+    lcd.setCursor(0, 3);
+    lcd.print("   Attempt " + String(attempt) + "/" + String(maxAttempts));
   }
+  
+  if (status == WL_CONNECTED) {
+    Serial.println("Connected to WiFi");
+    Serial.print("IP address: ");
+    const IPAddress currentIp = WiFi.localIP();
+    Serial.println(currentIp);
 
-  if (wifiStatus == WL_CONNECTED) {
-    delay(1000L);
-    Serial.println("Connected to Wi-Fi");
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("Signal strength (RSSI): ");
-    Serial.print(WiFi.RSSI());
-    Serial.println(" dBm");
+    if (const IPAddress lastKnownIp = loadLastKnownIp(); !isSameIp(currentIp, lastKnownIp)) {
+      Serial.print("IP address changed from ");
+      Serial.print(lastKnownIp);
+      Serial.print(" to ");
+      Serial.println(currentIp);
 
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("  Wi-Fi Connected!  ");
-    lcd.setCursor(0, 1);
-    lcd.print("IP: ");
-    lcd.print(WiFi.localIP());
-    lcd.setCursor(0, 2);
-    lcd.print("Waiting for app...");
-
-    Serial.print("Testing internet connection... ");
-    const String testServer = "www.google.com";
-    if (WiFiClient client; client.connect(testServer.c_str(), 80)) {
-      Serial.println("Success!");
-      matrix.loadFrame(wifi_matrix[3]);
-      lcd.setCursor(0, 3);
-      lcd.print("Internet: Connected");
-      client.stop();
-    } else {
-      Serial.println("Failed to connect to test server");
-      matrix.loadFrame(wifi_matrix[1]);
-      lcd.setCursor(0, 3);
-      lcd.print("Internet: Failed");
+      saveLastKnownIp(currentIp);
+      broadcastIpChange(currentIp.toString());
     }
+    
+    matrix.loadFrame(wifi_matrix[1]);
+    lcd.setCursor(0, 3);
+    lcd.print("      Connected     ");
+    delay(500);
   } else {
-    Serial.print("Failed to connect to WiFi. Status code: ");
-    Serial.println(wifiStatus);
-    matrix.loadFrame(wifi_matrix[0]);
-
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("WiFi Connection");
-    lcd.setCursor(0, 1);
-    lcd.print("Failed!");
-    lcd.setCursor(0, 2);
-    lcd.print("Status code: ");
-    lcd.print(wifiStatus);
+    Serial.println("Failed to connect to WiFi");
+    lcd.setCursor(0, 3);
+    lcd.print("  Connection failed  ");
   }
-
-  return wifiStatus;
+  
+  return status;
 }
