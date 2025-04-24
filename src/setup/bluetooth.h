@@ -6,7 +6,7 @@
 #include <Arduino_LED_Matrix.h>
 
 void setupBluetooth(String &ssid, String &password, LiquidCrystal_I2C &lcd);
-void broadcastWiFiStatus(int status, const String &message, const String &ipAddress, LiquidCrystal_I2C &lcd);
+void broadcastWiFiStatus(int status, const String &message, LiquidCrystal_I2C &lcd);
 void bluetoothLoop();
 void closeBluetooth();
 void startBluetooth(String &ssid, String &password, LiquidCrystal_I2C &lcd);

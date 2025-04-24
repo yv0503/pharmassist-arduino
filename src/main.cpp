@@ -12,8 +12,7 @@
 #include "utils/rtc_handler.h"
 #include "utils/ip_handler.h"
 
-// Arduino UNO R4 WiFi
-
+// Pin definitions
 #define PIN_CLK 5
 #define PIN_DAT 4
 #define PIN_RST 2
@@ -24,129 +23,133 @@
 RTCHandler rtcHandler(PIN_RST, PIN_CLK, PIN_DAT);
 LiquidCrystal_I2C lcd(LCD_ADDR, LCD_COLUMNS, LCD_ROWS);
 ArduinoLEDMatrix matrix;
+
+// Device state variables
 byte isInitialized = 0;
 bool isDeviceAcknowledged = false;
-
 String ssid = "";
 String password = "";
-unsigned long previousMillis = 0;
-constexpr long interval = 1000;
-byte currentFrame = 0;
-bool wasConnected = false;
-
-const String testServer = "www.google.com";
 int wifiStatus = WL_IDLE_STATUS;
-int failedAttempts = 0;
 
+// Timing variables
 unsigned long lastTimeUpdateMillis = 0;
-constexpr unsigned long timeUpdateInterval = 1000;
-
 unsigned long lastWifiCheckMillis = 0;
-constexpr unsigned long wifiCheckInterval = 60000;
-
 unsigned long lastBluetoothCheckMillis = 0;
-constexpr unsigned long bluetoothCheckInterval = 300000;
+
+// Time intervals (in milliseconds)
+constexpr unsigned long TIME_UPDATE_INTERVAL = 1000;
+constexpr unsigned long WIFI_CHECK_INTERVAL = 60000;
+constexpr unsigned long BLUETOOTH_CHECK_INTERVAL = 300000;
+constexpr unsigned long ACKNOWLEDGEMENT_TIMEOUT = 30000;
+constexpr unsigned long STARTUP_DELAY = 3000;
 
 void setup() {
   Serial.begin(9600);
-  Serial.println("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓");
-  Serial.println("┃               PharmAssist                 ┃");
-  Serial.println("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n");
+  Serial.println(F("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"));
+  Serial.println(F("┃               PharmAssist                 ┃"));
+  Serial.println(F("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n"));
+  
+  // Initialize hardware components
   EEPROM.begin();
   matrix.begin();
   lcd.init();
   lcd.backlight();
   lcd.setCursor(0, 1);
-  lcd.print("    PharmAssist");
+  lcd.print(F("    PharmAssist"));
 
   rtcHandler.initialize();
-
-  delay(3000);
+  delay(STARTUP_DELAY);
+  
+  // Check initialization status
   isInitialized = EEPROM.read(isInitializedAddress);
 
+  // Handle Bluetooth setup or reconnect based on initialization status
   if (isInitialized != 1) {
     runBluetoothSetup(ssid, password, matrix, lcd);
   } else {
     startBluetooth(ssid, password, lcd);
   }
 
+  // Connect to Wi-Fi with a retry mechanism
   loadWiFiCredentials(ssid, password);
   wifiStatus = connectToWiFi(ssid, password, matrix, lcd);
 
-  int retryCount = 0;
-  while (wifiStatus != WL_CONNECTED && retryCount < 2) {
-    Serial.print("WiFi connection failed. Retry attempt ");
+  // Retry Wi-Fi connection up to 2 more times
+  for (int retryCount = 0; retryCount < 2 && wifiStatus != WL_CONNECTED; retryCount++) {
+    Serial.print(F("WiFi connection failed. Retry attempt "));
     Serial.print(retryCount + 1);
-    Serial.println("/3...");
-    retryCount++;
+    Serial.println(F("/3..."));
     wifiStatus = connectToWiFi(ssid, password, matrix, lcd);
   }
 
+  // If the Wi-Fi connection still fails, reset and restart Bluetooth setup
   if (wifiStatus != WL_CONNECTED) {
-    Serial.println("WiFi connection failed after 3 attempts. Restarting Bluetooth setup...");
-
+    Serial.println(F("WiFi connection failed after 3 attempts. Restarting Bluetooth setup..."));
     EEPROM.update(isInitializedAddress, 0);
-
     runBluetoothSetup(ssid, password, matrix, lcd);
-
     loadWiFiCredentials(ssid, password);
     wifiStatus = connectToWiFi(ssid, password, matrix, lcd);
   }
 
+  // Setup web server if connected successfully
   if (wifiStatus == WL_CONNECTED) {
     setupWebServer();
-    Serial.print("Web server available at http://");
+    Serial.print(F("Web server available at http://"));
     Serial.println(WiFi.localIP());
     saveLastKnownIp(WiFi.localIP());
-    
-    broadcastWiFiStatus(wifiStatus, "Connected successfully.", WiFi.localIP().toString(), lcd);
+    broadcastWiFiStatus(wifiStatus, F("Connected successfully."), lcd);
   } else {
-    broadcastWiFiStatus(wifiStatus, "Failed to connect.", "0.0.0.0", lcd);
+    broadcastWiFiStatus(wifiStatus, F("Failed to connect."), lcd);
   }
 
+  // Wait for device acknowledgment with timeout
   const unsigned long acknowledgmentTimeoutStart = millis();
-  Serial.println("Waiting for device to acknowledge WiFi status (15s timeout)...");
-  // ReSharper disable CppDFALoopConditionNotUpdated
-  while (!isDeviceAcknowledged && millis() - acknowledgmentTimeoutStart < 15000) {
-    // ReSharper restore CppDFALoopConditionNotUpdated
+  Serial.println(F("Waiting for device to acknowledge WiFi status (35s timeout)..."));
+  
+  while (!isDeviceAcknowledged && millis() - acknowledgmentTimeoutStart < ACKNOWLEDGEMENT_TIMEOUT) {
     bluetoothLoop();
     delay(100);
-    if (wifiStatus == WL_CONNECTED)
+    if (wifiStatus == WL_CONNECTED) {
       handleWebServerClients(lcd, rtcHandler, isDeviceAcknowledged);
+    }
   }
 
   if (isDeviceAcknowledged) {
-    Serial.println("Device acknowledged WiFi status. Starting Bluetooth timeout.");
+    Serial.println(F("Device acknowledged WiFi status. Starting Bluetooth timeout."));
   } else {
-    Serial.println("No acknowledgment received after timeout. Keeping Bluetooth active.");
+    Serial.println(F("No acknowledgment received after timeout. Keeping Bluetooth active."));
   }
 
-  delay(3000);
+  // Final setup display
+  delay(STARTUP_DELAY);
   matrix.clear();
   digitalWrite(LED_BUILTIN, HIGH);
-  delay(3000L);
+  delay(STARTUP_DELAY);
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("    PharmAssist");
+  lcd.print(F("    PharmAssist"));
 }
 
 void loop() {
   const unsigned long currentMillis = millis();
 
-  if (currentMillis - lastWifiCheckMillis >= wifiCheckInterval) {
+  // Periodic Wi-Fi connection check
+  if (currentMillis - lastWifiCheckMillis >= WIFI_CHECK_INTERVAL) {
     lastWifiCheckMillis = currentMillis;
     
     if (WiFi.status() != WL_CONNECTED) {
-      Serial.println("WiFi connection lost. Attempting to reconnect...");
+      Serial.println(F("WiFi connection lost. Attempting to reconnect..."));
       wifiStatus = connectToWiFi(ssid, password, matrix, lcd);
 
+      // Start Bluetooth if Wi-Fi fails and Bluetooth isn't active
       if (wifiStatus != WL_CONNECTED && !isBluetoothActive()) {
         startBluetooth(ssid, password, lcd);
       }
     }
   }
 
-  if (currentMillis - lastBluetoothCheckMillis >= bluetoothCheckInterval) {
+  // Periodic Bluetooth connection check
+  if (currentMillis - lastBluetoothCheckMillis >= BLUETOOTH_CHECK_INTERVAL) {
     lastBluetoothCheckMillis = currentMillis;
 
     if (!isBleConnected()) {
@@ -154,11 +157,13 @@ void loop() {
     }
   }
 
+  // Handle web server clients if Wi-Fi is connected
   if (wifiStatus == WL_CONNECTED) {
     handleWebServerClients(lcd, rtcHandler, isDeviceAcknowledged);
   }
 
-  if (currentMillis - lastTimeUpdateMillis >= timeUpdateInterval) {
+  // Update time display
+  if (currentMillis - lastTimeUpdateMillis >= TIME_UPDATE_INTERVAL) {
     lastTimeUpdateMillis = currentMillis;
 
     const String formattedTime = rtcHandler.getFormattedTime();
@@ -166,12 +171,12 @@ void loop() {
     const String formattedDate = rtcHandler.getFormattedDate();
 
     lcd.setCursor(0, 2);
-    lcd.print("  " + formattedWeekDay + ", " + formattedDate);
-    lcd.print("    ");
+    lcd.print("  " + formattedWeekDay + ", " + formattedDate + "    ");
 
     lcd.setCursor(0, 3);
     lcd.print("      " + formattedTime);
   }
 
+  // Process Bluetooth events
   bluetoothLoop();
 }

@@ -8,12 +8,12 @@ WiFiServer server(80);
 
 void setupWebServer() {
   server.begin();
-  Serial.println("Web server started");
+  Serial.println(F("Web server started"));
 }
 
 void handleWebServerClients(LiquidCrystal_I2C &lcd, RTCHandler &rtcHandler, bool &isDeviceAcknowledged) {
   if (WiFiClient client = server.available()) {
-    Serial.print("New client connected: ");
+    Serial.print(F("New client connected: "));
     Serial.println(client.remoteIP());
     
     String currentLine = "";
@@ -30,7 +30,7 @@ void handleWebServerClients(LiquidCrystal_I2C &lcd, RTCHandler &rtcHandler, bool
 
         if (const char c = client.read(); c == '\n') {
           if (currentLine.length() == 0) {
-            if (contentLength > 0 && (method == "POST" || method == "PUT")) {
+            if (contentLength > 0 && (method == F("POST") || method == F("PUT"))) {
               int bodyBytesRead = 0;
               while (bodyBytesRead < contentLength && client.available() && millis() - timeout < 2000) {
                 const char ch = client.read();
@@ -38,33 +38,33 @@ void handleWebServerClients(LiquidCrystal_I2C &lcd, RTCHandler &rtcHandler, bool
                 bodyBytesRead++;
                 timeout = millis();
               }
-              Serial.print("Request body: ");
+              Serial.print(F("Request body: "));
               Serial.println(requestBody);
             }
 
-            if (endpoint.startsWith("/api/")) {
+            if (endpoint.startsWith(F("/api/"))) {
               auto [statusCode, contentType, body] =
                 ApiHandler::processRequest(endpoint, method, requestBody, isDeviceAcknowledged, lcd, rtcHandler);
 
-              client.print("HTTP/1.1 ");
+              client.print(F("HTTP/1.1 "));
               client.print(statusCode);
-              client.println(" OK");
-              client.print("Content-Type: ");
+              client.println(F(" OK"));
+              client.print(F("Content-Type: "));
               client.println(contentType);
-              client.println("Connection: close");
+              client.println(F("Connection: close"));
               client.println();
               client.println(body);
             } else {
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-type:text/html");
-              client.println("Connection: close");
+              client.println(F("HTTP/1.1 200 OK"));
+              client.println(F("Content-type:text/html"));
+              client.println(F("Connection: close"));
               client.println();
               client.print(HTML_MAIN_CONTENT);
             }
             break;
           }
 
-          if (currentLine.startsWith("GET ") || currentLine.startsWith("POST ")) {
+          if (currentLine.startsWith(F("GET ")) || currentLine.startsWith(F("POST "))) {
             const int firstSpace = currentLine.indexOf(' ');
             const int secondSpace = currentLine.indexOf(' ', firstSpace + 1);
               
@@ -74,9 +74,9 @@ void handleWebServerClients(LiquidCrystal_I2C &lcd, RTCHandler &rtcHandler, bool
             if (const int queryStart = endpoint.indexOf('?'); queryStart != -1) {
               endpoint = endpoint.substring(0, queryStart);
             }
-          } else if (currentLine.startsWith("Content-Length: ")) {
+          } else if (currentLine.startsWith(F("Content-Length: "))) {
             contentLength = currentLine.substring(16).toInt();
-            Serial.print("Content Length: ");
+            Serial.print(F("Content Length: "));
             Serial.println(contentLength);
           }
           currentLine = "";

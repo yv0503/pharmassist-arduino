@@ -8,7 +8,7 @@ void RTCHandler::initialize() {
     rtc.init();
     
     if (rtc.isHalted()) {
-        Serial.println("RTC was not running, setting default time");
+        Serial.println(F("RTC was not running, setting default time"));
         Ds1302::DateTime dt = {
             .year = 25,
             .month = 1,
@@ -20,7 +20,7 @@ void RTCHandler::initialize() {
         };
         rtc.setDateTime(&dt);
     } else {
-        Serial.println("RTC is running properly");
+        Serial.println(F("RTC is running properly"));
     }
 }
 
@@ -65,7 +65,7 @@ String RTCHandler::getFormattedDateTime() {
 
 String RTCHandler::getFormattedWeekDay() {
     const Ds1302::DateTime now = getCurrentDateTime();
-    const String daysOfWeek[] = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+    static String const daysOfWeek[] = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
     return daysOfWeek[now.dow - 1];
 }
 

@@ -1,7 +1,7 @@
 #ifndef HTML_CONTENT_H
 #define HTML_CONTENT_H
 
-inline auto HTML_MAIN_CONTENT = R"(
+inline auto HTML_MAIN_CONTENT = F(R"(
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -41,6 +41,6 @@ c-1.1,0-2-0.9-2-2S34.9,68,36,68z"/>
 </div>
 </body>
 </html>
-)";
+)");
 
 #endif

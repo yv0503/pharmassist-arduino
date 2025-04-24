@@ -16,17 +16,17 @@ ApiResponse ApiHandler::processRequest(
   LiquidCrystal_I2C &lcd,
   RTCHandler &rtcHandler
 ) {
-  Serial.print("API Request: ");
+  Serial.print(F("API Request: "));
   Serial.print(method);
-  Serial.print(" ");
+  Serial.print(F(" "));
   Serial.println(endpoint);
   
   if (!requestBody.isEmpty()) {
-    Serial.print("Request Body: ");
+    Serial.print(F("Request Body: "));
     Serial.println(requestBody);
   }
 
-  if (method == "GET") {
+  if (method == F("GET")) {
     switch (hash(endpoint.c_str())) {
       case "/api/status_check"_hash:
         return handleStatusCheck(isDeviceAcknowledged);
@@ -39,7 +39,7 @@ ApiResponse ApiHandler::processRequest(
     }
   }
 
-  if (method == "POST") {
+  if (method == F("POST")) {
     switch (hash(endpoint.c_str())) {
       case "/api/reset"_hash:
         return handleReset(lcd);
@@ -56,10 +56,10 @@ ApiResponse ApiHandler::processRequest(
 
   ApiResponse response;
   response.statusCode = 404;
-  response.contentType = "application/json";
+  response.contentType = F("application/json");
 
   JsonDocument message;
-  message["error"] = "Endpoint not found";
+  message["error"] = F("Endpoint not found");
   serializeJson(message, response.body);
   
   return response;
@@ -70,11 +70,11 @@ ApiResponse ApiHandler::handleAcknowledge(bool &isDeviceAcknowledged) {
 
   ApiResponse response;
   response.statusCode = 200;
-  response.contentType = "application/json";
+  response.contentType = F("application/json");
 
   JsonDocument message;
-  message["status"] = "success";
-  message["message"] = "Device acknowledged successfully.";
+  message["status"] = F("success");
+  message["message"] = F("Device acknowledged successfully.");
   serializeJson(message, response.body);
 
   return response;
@@ -83,42 +83,42 @@ ApiResponse ApiHandler::handleAcknowledge(bool &isDeviceAcknowledged) {
 ApiResponse ApiHandler::handleStatusCheck(const bool &isDeviceAcknowledged) {
   ApiResponse response;
   response.statusCode = 200;
-  response.contentType = "application/json";
+  response.contentType = F("application/json");
 
   JsonDocument message;
 
   if (isDeviceAcknowledged) {
-    message["status"] = "success";
-    message["message"] = "PharmAssist is running and ready to assist!";
+    message["status"] = F("success");
+    message["message"] = F("PharmAssist is running and ready to assist!");
   } else {
-    message["status"] = "needs_acknowledgement";
-    message["message"] = "PharmAssist is running but needs Bluetooth acknowledgment.";
+    message["status"] = F("needs_acknowledgement");
+    message["message"] = F("PharmAssist is running but needs Bluetooth acknowledgment.");
   }
 
   serializeJson(message, response.body);
 
-  return  response;
+  return response;
 }
 
 ApiResponse ApiHandler::handleReset(LiquidCrystal_I2C& lcd) {
   EEPROM.update(isInitializedAddress, 0);
   digitalWrite(LED_BUILTIN, LOW);
 
-  Serial.println("Factory reset performed via API");
+  Serial.println(F("Factory reset performed via API"));
 
   lcd.clear();
   lcd.setCursor(0, 1);
-  lcd.print(" Factory reset done");
+  lcd.print(F(" Factory reset done"));
   lcd.setCursor(0, 2);
-  lcd.print("  Restart Required");
+  lcd.print(F("  Restart Required"));
 
   ApiResponse response;
   response.statusCode = 200;
-  response.contentType = "application/json";
+  response.contentType = F("application/json");
   
   JsonDocument message;
-  message["status"] = "success";
-  message["message"] = "Factory reset performed. Device restart required.";
+  message["status"] = F("success");
+  message["message"] = F("Factory reset performed. Device restart required.");
   serializeJson(message, response.body);
   
   return response;
@@ -127,15 +127,15 @@ ApiResponse ApiHandler::handleReset(LiquidCrystal_I2C& lcd) {
 ApiResponse ApiHandler::handleHelloWorld(LiquidCrystal_I2C& lcd) {
   lcd.clear();
   lcd.setCursor(0, 1);
-  lcd.print("    Hello World!");
+  lcd.print(F("    Hello World!"));
 
   ApiResponse response;
   response.statusCode = 200;
-  response.contentType = "application/json";
+  response.contentType = F("application/json");
 
   JsonDocument message;
-  message["status"] = "success";
-  message["message"] = "Hello World from PharmAssist!";
+  message["status"] = F("success");
+  message["message"] = F("Hello World from PharmAssist!");
   serializeJson(message, response.body);
 
   return response;
@@ -144,15 +144,15 @@ ApiResponse ApiHandler::handleHelloWorld(LiquidCrystal_I2C& lcd) {
 ApiResponse ApiHandler::handleDisplayName(LiquidCrystal_I2C &lcd) {
   lcd.clear();
   lcd.setCursor(0, 1);
-  lcd.print("    PharmAssist");
+  lcd.print(F("    PharmAssist"));
 
   ApiResponse response;
   response.statusCode = 200;
-  response.contentType = "application/json";
+  response.contentType = F("application/json");
 
   JsonDocument message;
-  message["status"] = "success";
-  message["message"] = "PharmAssist";
+  message["status"] = F("success");
+  message["message"] = F("PharmAssist");
   serializeJson(message, response.body);
 
   return response;
@@ -160,7 +160,7 @@ ApiResponse ApiHandler::handleDisplayName(LiquidCrystal_I2C &lcd) {
 
 ApiResponse ApiHandler::handleDisplayMessage(LiquidCrystal_I2C &lcd, const String &requestBodyStr) {
   ApiResponse response;
-  response.contentType = "application/json";
+  response.contentType = F("application/json");
 
   JsonDocument requestBody;
   deserializeJson(requestBody, requestBodyStr);
@@ -174,8 +174,8 @@ ApiResponse ApiHandler::handleDisplayMessage(LiquidCrystal_I2C &lcd, const Strin
     response.statusCode = 400;
 
     JsonDocument errorMessage;
-    errorMessage["error"] = "Message too long";
-    errorMessage["message"] = "Each line must be less than or equal to 20 characters.";
+    errorMessage["error"] = F("Message too long");
+    errorMessage["message"] = F("Each line must be less than or equal to 20 characters.");
     serializeJson(errorMessage, response.body);
     return response;
   }
@@ -192,8 +192,8 @@ ApiResponse ApiHandler::handleDisplayMessage(LiquidCrystal_I2C &lcd, const Strin
   
   response.statusCode = 200;
   JsonDocument message;
-  message["status"] = "success";
-  message["message"] = "Message displayed on LCD";
+  message["status"] = F("success");
+  message["message"] = F("Message displayed on LCD");
   serializeJson(message, response.body);
   
   return response;
@@ -201,7 +201,7 @@ ApiResponse ApiHandler::handleDisplayMessage(LiquidCrystal_I2C &lcd, const Strin
 
 ApiResponse ApiHandler::handleSetTime(const String &requestBodyStr, RTCHandler &rtcHandler) {
   ApiResponse response;
-  response.contentType = "application/json";
+  response.contentType = F("application/json");
   
   JsonDocument requestBody;
   DeserializationError error = deserializeJson(requestBody, requestBodyStr);
@@ -210,7 +210,7 @@ ApiResponse ApiHandler::handleSetTime(const String &requestBodyStr, RTCHandler &
     response.statusCode = 400;
     
     JsonDocument errorMessage;
-    errorMessage["error"] = "Invalid JSON";
+    errorMessage["error"] = F("Invalid JSON");
     errorMessage["message"] = error.c_str();
     serializeJson(errorMessage, response.body);
     return response;
@@ -220,8 +220,8 @@ ApiResponse ApiHandler::handleSetTime(const String &requestBodyStr, RTCHandler &
     response.statusCode = 400;
     
     JsonDocument errorMessage;
-    errorMessage["error"] = "Missing required field";
-    errorMessage["message"] = "The 'epochTime' field is required.";
+    errorMessage["error"] = F("Missing required field");
+    errorMessage["message"] = F("The 'epochTime' field is required.");
     serializeJson(errorMessage, response.body);
     return response;
   }
@@ -233,12 +233,11 @@ ApiResponse ApiHandler::handleSetTime(const String &requestBodyStr, RTCHandler &
   response.statusCode = 200;
   
   JsonDocument message;
-  message["status"] = "success";
-  message["message"] = "Time set successfully";
+  message["status"] = F("success");
+  message["message"] = F("Time set successfully");
   message["currentTime"] = rtcHandler.getFormattedDateTime();
   message["epochTime"] = rtcHandler.getEpochTime();
   serializeJson(message, response.body);
   
   return response;
 }
-

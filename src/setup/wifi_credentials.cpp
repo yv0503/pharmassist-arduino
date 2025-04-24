@@ -16,7 +16,7 @@ void saveWiFiCredentials(const String &ssid, const String &password) {
     }
     EEPROM.update(passwordStartAddress + password.length(), 0);
 
-    Serial.println("WiFi credentials saved to EEPROM");
+    Serial.println(F("WiFi credentials saved to EEPROM"));
 }
 
 void loadWiFiCredentials(String &ssid, String &password) {
@@ -34,6 +34,9 @@ void loadWiFiCredentials(String &ssid, String &password) {
         password += c;
     }
 
-    Serial.println("Loaded SSID: " + ssid);
-    Serial.println("Loaded password: " + String(password.length()) + " characters");
+    Serial.print(F("Loaded SSID: "));
+    Serial.println(ssid);
+    Serial.print(F("Loaded password: "));
+    Serial.print(password.length());
+    Serial.println(F(" characters"));
 }
