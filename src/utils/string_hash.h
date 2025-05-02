@@ -11,8 +11,8 @@
  */
 constexpr uint64_t hash(const std::string_view str) {
     uint64_t hash = 0;
-    for (const char c : str) {
-        hash = (hash * 131) + c;
+    for (const char c: str) {
+        hash = hash * 131 + c;
     }
     return hash;
 }
@@ -21,7 +21,7 @@ constexpr uint64_t hash(const std::string_view str) {
  * String literal operator for creating hash values
  * Usage: "some_string"_hash
  */
-constexpr uint64_t operator"" _hash(const char* str, const size_t len) {
+constexpr uint64_t operator"" _hash(const char *str, const size_t len) {
     return hash(std::string_view(str, len));
 }
 

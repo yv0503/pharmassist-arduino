@@ -5,7 +5,6 @@
 #include <Ds1302.h>
 
 class RTCHandler {
-private:
     Ds1302 rtc;
     
 public:

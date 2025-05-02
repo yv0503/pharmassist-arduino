@@ -4,6 +4,8 @@
 #include <WiFiS3.h>
 #include <LiquidCrystal_I2C.h>
 
+#include "utils/lcd_handler.h"
+#include "utils/preferences_handler.h"
 #include "utils/rtc_handler.h"
 
 struct ApiResponse {
@@ -18,18 +20,22 @@ public:
     const String &endpoint,
     const String &method,
     const String &requestBody,
+    const PreferencesHandler &prefsHandler,
     bool &isDeviceAcknowledged,
-    LiquidCrystal_I2C &lcd,
-    RTCHandler &rtcHandler
+    LCDHandler &lcdHandler, RTCHandler &rtcHandler
   );
 
 private:
   static ApiResponse handleAcknowledge(bool &isDeviceAcknowledged);
+
   static ApiResponse handleStatusCheck(const bool &isDeviceAcknowledged);
-  static ApiResponse handleReset(LiquidCrystal_I2C& lcd);
-  static ApiResponse handleHelloWorld(LiquidCrystal_I2C& lcd);
-  static ApiResponse handleDisplayName(LiquidCrystal_I2C& lcd);
-  static ApiResponse handleDisplayMessage(LiquidCrystal_I2C& lcd, const String& requestBodyStr);
+
+  static ApiResponse handleReset(const LCDHandler &lcdHandler, const PreferencesHandler &prefsHandler);
+
+  static ApiResponse handleHelloWorld(const LCDHandler &lcdHandler);
+
+  static ApiResponse handleDisplayMessage(LCDHandler &lcdHandler, const String &requestBodyStr);
+
   static ApiResponse handleSetTime(const String &requestBodyStr, RTCHandler &rtcHandler);
 };
 

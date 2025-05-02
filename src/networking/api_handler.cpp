@@ -1,10 +1,10 @@
 #include <Arduino.h>
-#include <EEPROM.h>
 #include <ArduinoJson.h>
 
-#include <constants.h>
 #include "api_handler.h"
 
+#include "utils/lcd_handler.h"
+#include "utils/preferences_handler.h"
 #include "utils/rtc_handler.h"
 #include "utils/string_hash.h"
 
@@ -12,15 +12,16 @@ ApiResponse ApiHandler::processRequest(
   const String &endpoint,
   const String &method,
   const String &requestBody,
+  const PreferencesHandler &prefsHandler,
   bool &isDeviceAcknowledged,
-  LiquidCrystal_I2C &lcd,
+  LCDHandler &lcdHandler,
   RTCHandler &rtcHandler
 ) {
   Serial.print(F("API Request: "));
   Serial.print(method);
   Serial.print(F(" "));
   Serial.println(endpoint);
-  
+
   if (!requestBody.isEmpty()) {
     Serial.print(F("Request Body: "));
     Serial.println(requestBody);
@@ -31,9 +32,7 @@ ApiResponse ApiHandler::processRequest(
       case "/api/status_check"_hash:
         return handleStatusCheck(isDeviceAcknowledged);
       case "/api/hello_world"_hash:
-        return handleHelloWorld(lcd);
-      case "/api/display_name"_hash:
-        return handleDisplayName(lcd);
+        return handleHelloWorld(lcdHandler);
       default:
         break;
     }
@@ -42,9 +41,9 @@ ApiResponse ApiHandler::processRequest(
   if (method == F("POST")) {
     switch (hash(endpoint.c_str())) {
       case "/api/reset"_hash:
-        return handleReset(lcd);
+        return handleReset(lcdHandler, prefsHandler);
       case "/api/display_message"_hash:
-        return handleDisplayMessage(lcd, requestBody);
+        return handleDisplayMessage(lcdHandler, requestBody);
       case "/api/set_time"_hash:
         return handleSetTime(requestBody, rtcHandler);
       case "/api/acknowledge"_hash:
@@ -61,7 +60,7 @@ ApiResponse ApiHandler::processRequest(
   JsonDocument message;
   message["error"] = F("Endpoint not found");
   serializeJson(message, response.body);
-  
+
   return response;
 }
 
@@ -100,34 +99,31 @@ ApiResponse ApiHandler::handleStatusCheck(const bool &isDeviceAcknowledged) {
   return response;
 }
 
-ApiResponse ApiHandler::handleReset(LiquidCrystal_I2C& lcd) {
-  EEPROM.update(isInitializedAddress, 0);
+ApiResponse ApiHandler::handleReset(const LCDHandler &lcdHandler, const PreferencesHandler &prefsHandler) {
+  prefsHandler.deletePreferences();
   digitalWrite(LED_BUILTIN, LOW);
 
   Serial.println(F("Factory reset performed via API"));
 
-  lcd.clear();
-  lcd.setCursor(0, 1);
-  lcd.print(F(" Factory reset done"));
-  lcd.setCursor(0, 2);
-  lcd.print(F("  Restart Required"));
+  lcdHandler.clear();
+  lcdHandler.displayMsgCentered(F("Factory reset done"), 1);
+  lcdHandler.displayMsgCentered(F("Restart Required"), 2);
 
   ApiResponse response;
   response.statusCode = 200;
   response.contentType = F("application/json");
-  
+
   JsonDocument message;
   message["status"] = F("success");
   message["message"] = F("Factory reset performed. Device restart required.");
   serializeJson(message, response.body);
-  
+
   return response;
 }
 
-ApiResponse ApiHandler::handleHelloWorld(LiquidCrystal_I2C& lcd) {
-  lcd.clear();
-  lcd.setCursor(0, 1);
-  lcd.print(F("    Hello World!"));
+ApiResponse ApiHandler::handleHelloWorld(const LCDHandler &lcdHandler) {
+  lcdHandler.clear();
+  lcdHandler.displayMsgCentered(F("Hello World"), 1);
 
   ApiResponse response;
   response.statusCode = 200;
@@ -141,24 +137,7 @@ ApiResponse ApiHandler::handleHelloWorld(LiquidCrystal_I2C& lcd) {
   return response;
 }
 
-ApiResponse ApiHandler::handleDisplayName(LiquidCrystal_I2C &lcd) {
-  lcd.clear();
-  lcd.setCursor(0, 1);
-  lcd.print(F("    PharmAssist"));
-
-  ApiResponse response;
-  response.statusCode = 200;
-  response.contentType = F("application/json");
-
-  JsonDocument message;
-  message["status"] = F("success");
-  message["message"] = F("PharmAssist");
-  serializeJson(message, response.body);
-
-  return response;
-}
-
-ApiResponse ApiHandler::handleDisplayMessage(LiquidCrystal_I2C &lcd, const String &requestBodyStr) {
+ApiResponse ApiHandler::handleDisplayMessage(LCDHandler &lcdHandler, const String &requestBodyStr) {
   ApiResponse response;
   response.contentType = F("application/json");
 
@@ -180,64 +159,60 @@ ApiResponse ApiHandler::handleDisplayMessage(LiquidCrystal_I2C &lcd, const Strin
     return response;
   }
 
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print(line1);
-  lcd.setCursor(0, 1);
-  lcd.print(line2);
-  lcd.setCursor(0, 2);
-  lcd.print(line3);
-  lcd.setCursor(0, 3);
-  lcd.print(line4);
-  
+  lcdHandler.clear();
+  lcdHandler.displayMsg(line1, 1);
+  lcdHandler.displayMsg(line2, 2);
+  lcdHandler.displayMsg(line3, 3);
+  lcdHandler.displayMsg(line4, 4);
+
   response.statusCode = 200;
   JsonDocument message;
   message["status"] = F("success");
   message["message"] = F("Message displayed on LCD");
   serializeJson(message, response.body);
-  
+
   return response;
 }
 
 ApiResponse ApiHandler::handleSetTime(const String &requestBodyStr, RTCHandler &rtcHandler) {
   ApiResponse response;
   response.contentType = F("application/json");
-  
+
   JsonDocument requestBody;
   DeserializationError error = deserializeJson(requestBody, requestBodyStr);
-  
+
   if (error) {
     response.statusCode = 400;
-    
+
     JsonDocument errorMessage;
     errorMessage["error"] = F("Invalid JSON");
     errorMessage["message"] = error.c_str();
     serializeJson(errorMessage, response.body);
     return response;
   }
-  
+
   if (requestBody["epochTime"].isNull()) {
     response.statusCode = 400;
-    
+
     JsonDocument errorMessage;
     errorMessage["error"] = F("Missing required field");
     errorMessage["message"] = F("The 'epochTime' field is required.");
     serializeJson(errorMessage, response.body);
     return response;
   }
-  
+
   unsigned long epochTime = requestBody["epochTime"];
 
   rtcHandler.setTimeFromEpoch(epochTime);
-  
+
   response.statusCode = 200;
-  
+
   JsonDocument message;
   message["status"] = F("success");
   message["message"] = F("Time set successfully");
   message["currentTime"] = rtcHandler.getFormattedDateTime();
   message["epochTime"] = rtcHandler.getEpochTime();
   serializeJson(message, response.body);
-  
+
   return response;
 }
