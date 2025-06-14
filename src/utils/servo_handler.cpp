@@ -9,7 +9,7 @@ void ServoHandler::initialize(const uint8_t servo_pin) const {
     _servo->attach(servo_pin);
 }
 
-void ServoHandler::toMedicineContainer(const uint8_t timeInMillis, const uint8_t currentContainer,const uint8_t nextContainer) const {
+void ServoHandler::toNextContainer(const uint8_t timeInMillis, const uint8_t currentContainer,const uint8_t nextContainer) const {
     if (currentContainer != 4) {
         _servo->write(180);
         delay(timeInMillis * (nextContainer - currentContainer));
