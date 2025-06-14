@@ -12,6 +12,7 @@
 #include "utils/rtc_handler.h"
 #include "utils/lcd_handler.h"
 #include "utils/preferences_handler.h"
+#include "utils/servo_handler.h"
 
 /*
  *  Arduino R4 WiFI
@@ -24,6 +25,7 @@
 #define PIN_SPI_CS 4
 #define PIN_RED_BUTTON 2
 #define PIN_BLUE_BUTTON 3
+#define PIN_SERVO 5
 
 #define LCD_ADDR 0x27
 #define LCD_COLUMNS 20
@@ -50,9 +52,15 @@ constexpr unsigned long ACKNOWLEDGEMENT_TIMEOUT = 30000;
 constexpr unsigned long WIFI_CHECK_INTERVAL = 60000;
 constexpr unsigned long BLUETOOTH_CHECK_INTERVAL = 10000;
 constexpr unsigned long STARTUP_DELAY = 2000;
+constexpr unsigned long SERVO_TURN_TIME = 200;
+
+//Container test variables
+unsigned int CURRENT_CONTAINER = 0;
+unsigned int NEXT_CONTAINER = 2;
 
 RTCHandler rtcHandler(PIN_RST, PIN_CLK, PIN_DAT);
 LCDHandler lcdHandler(LCD_ADDR, LCD_COLUMNS, LCD_ROWS);
+ServoHandler servoHandler;
 PreferencesHandler prefsHandler;
 
 void redButtonPressed() { redButtonFlag = true; }
@@ -66,6 +74,7 @@ void setup() {
 
     lcdHandler.initialize();
     lcdHandler.displayTitle(DEVICE_NAME);
+    servoHandler.initialize(PIN_SERVO);
 
     Serial.println(F("Starting..."));
     delay(STARTUP_DELAY);
@@ -192,6 +201,7 @@ void loop() {
         Serial.println(F("Red button pressed"));
         lcdHandler.clear();
         lcdHandler.displayMsgCentered(F("Red button pressed"), 1);
+        servoHandler.toMedicineContainer(SERVO_TURN_TIME, CURRENT_CONTAINER, NEXT_CONTAINER);
         delay(2000);
         lcdHandler.clear();
     }
@@ -201,6 +211,7 @@ void loop() {
         Serial.println(F("Blue button pressed - Restarting Bluetooth"));
         lcdHandler.clear();
         lcdHandler.displayMsgCentered(F("Bluetooth Restarted"), 1);
+        servoHandler.resetPosition(SERVO_TURN_TIME, CURRENT_CONTAINER);
         startBluetooth(ssid, password, lcdHandler, prefsHandler);
         delay(2000);
         lcdHandler.clear();
